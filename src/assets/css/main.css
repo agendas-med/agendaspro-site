@@ -3,13 +3,9 @@
 @import "./fonts.css";
 @import "./font-classes.css";
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
 * {
-    margin: 0;
-    padding: 0;
     box-sizing: border-box;
 }
 
@@ -17,6 +13,7 @@ html, body {
     overflow: hidden;
     min-height: 100vh;
     position: relative;
+    font-family: Poppins;
 }
 
 .avatar {
@@ -64,6 +61,7 @@ html, body {
   align-items: center;
   justify-content: center;
   padding: var(--space-4);
+  gap: var(--space-4);
   border-radius: var(--radius-md);
   border: none;
   cursor: pointer;
@@ -72,6 +70,7 @@ html, body {
   max-width: 300px;
   font-size: var(--fontsize-md);
   font-weight: 600;
+  height: 42px;
 
   & svg {
     margin-right: var(--space-3);
@@ -258,6 +257,7 @@ input:not([type="checkbox"]):not([type="radio"]), textarea, select, .input {
   border: 1px solid var(--cinza-medio);
   margin-right: var(--space-3);
   position: relative;
+  background: var(--branco);
 }
 
   input:not([type="checkbox"]):not([type="radio"]):focus, textarea:focus, select:focus, .input.focus {
@@ -402,4 +402,27 @@ input[type="checkbox"], input[type="radio"] {
 .fade-leave-to {
   opacity: 0;
   transform: translateY(-10px);
+}
+
+.slide-fade-enter-active {
+  transition: all 0.3s ease-out;
+}
+
+.slide-fade-leave-active {
+  transition: all 0.3s cubic-bezier(1, 0.5, 0.8, 1);
+}
+
+.slide-fade-enter-from,
+.slide-fade-leave-to {
+  transform: translateY(-10px); /* Opcional: um leve deslize de cima para baixo */
+  opacity: 0;
+  max-height: 0; /* Começa/termina com altura zero */
+  /* overflow: hidden; já está no elemento principal, mas pode ser reforçado aqui se necessário */
+}
+
+.slide-fade-enter-to,
+.slide-fade-leave-from {
+  transform: translateY(0);
+  opacity: 1;
+  max-height: 500px; /* Defina um valor que seja maior que a altura máxima do seu menu */
 }

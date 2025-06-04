@@ -1,15 +1,13 @@
-import Vue from 'vue';
-import VueRouter from 'vue-router';
+import { createRouter, createWebHistory } from 'vue-router';
 
-import api from "../configs/api";
-
-Vue.use(VueRouter);
+// import api from "../configs/api";
 
 import indexPage from '../pages/indexPage.vue';
 
 const routes = [
     {
         path: '/',
+        name: 'Home',
         component: indexPage,
         meta: {
             title: "AgendasPRO",
@@ -20,18 +18,14 @@ const routes = [
         }
     },
     {
-        path: '',
+        path: '/:pathMatch(.*)*',
         redirect: '/'
-    },
-    {
-        path: "*",
-        redirect: "/"
     }
 ];
 
-const router = new VueRouter({
+const router = createRouter({
+    history: createWebHistory('/'),
     routes,
-    mode: 'history'
 });
 
 export default router;
