@@ -1,5 +1,5 @@
 <template>
-  <header class="flex justify-between p-4 md:p-6 items-center relative shadow-sm bg-white"> <img src="../assets/AGENDASPRO.png" alt="Logo AgendasPRO" class="h-10 md:h-12 w-auto">
+  <header class="flex justify-between p-4 md:p-6 items-center bg-white fixed top-0 left-0 z-10 w-full shadow-md"> <img src="../assets/AGENDASPRO.png" alt="Logo AgendasPRO" class="h-10 md:h-12 w-auto">
     <div class="md:hidden">
       <button @click="toggleMobileMenu" class="text-gray-700 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500">
         <svg v-if="!isMobileMenuOpen" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -13,15 +13,15 @@
 
     <nav class="hidden md:flex items-center">
       <ul class="flex items-center gap-8 lg:gap-10">
-        <li><a href="#" class="text-gray-600 hover:text-indigo-600">Agendar</a></li>
-        <li><a href="#" class="text-gray-600 hover:text-indigo-600">Sobre</a></li>
-        <li><a href="#" class="text-gray-600 hover:text-indigo-600">Perguntas frequentes</a></li>
+        <li><a href="#agendar" anchor class="text-gray-600 hover:text-indigo-600">Agendar</a></li>
+        <li><a href="#sobre" anchor class="text-gray-600 hover:text-indigo-600">Sobre</a></li>
+        <li><a href="#perguntas" anchor class="text-gray-600 hover:text-indigo-600">Perguntas frequentes</a></li>
       </ul>
     </nav>
 
     <div class="hidden md:flex gap-3 items-center">
-      <a href="#" class="text-gray-600 hover:text-indigo-600">Entrar</a>
-      <button class="btn btn-primary">Registrar</button>
+      <a href="https://app.agendaspro.com/entrar" target="_blank" class="text-gray-600 hover:text-indigo-600">Entrar</a>
+      <a href="https://app.agendaspro.com/registrar" target="_blank" class="btn btn-primary">Registrar</a>
     </div>
 
     <transition name="slide-fade">

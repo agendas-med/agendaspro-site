@@ -6,6 +6,10 @@
     color: var(--verde);
 }
 
+.bg-verde-escuro {
+    background: var(--verde-escuro);
+}
+
 .cinza {
     color: var(--cinza);
 }

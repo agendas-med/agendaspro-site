@@ -1,5 +1,5 @@
 <template>
-  <div id="app">
+  <div id="app" class="main-app">
     <router-view path="$router.key" />
   </div>
 </template>
@@ -17,6 +17,7 @@ export default {
 #app {
   height: 100vh;
   width: 100vw;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 </style>

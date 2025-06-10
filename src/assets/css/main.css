@@ -10,10 +10,10 @@
 }
 
 html, body {
-    overflow: hidden;
     min-height: 100vh;
     position: relative;
     font-family: Poppins;
+    scroll-behavior: smooth;
 }
 
 .avatar {
@@ -388,6 +388,19 @@ input[type="checkbox"], input[type="radio"] {
 
 .authentication-header {
   margin-bottom: var(--space-7);
+}
+
+a:hover {
+  color: var(--verde-escuro);
+}
+
+footer a:hover {
+  color: var(--branco) !important;
+  text-decoration: underline;
+}
+
+section {
+  scroll-margin-top: 120px;
 }
 
 /* ANIMAÇÕES DO VUE */

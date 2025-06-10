@@ -1,5 +1,5 @@
 <template>
-    <section class="flex items-center justify-center">
+    <section class="flex items-center justify-center mt-20" id="agendar">
         <img src="../assets/hero-background.png">
         <div class="procurar-agendamento m-6">
             <p class="fontsize-xl-bold">Busque um serviço</p>
@@ -41,5 +41,12 @@ img {
         color: var(--branco);
     }
     
+}
+@media (max-width: 580px) {
+    .busca-inputs input, .busca-inputs button {
+        width: 100%;
+        max-width: 100%;
+        min-width: 100%;
+    }
 }
 </style>
