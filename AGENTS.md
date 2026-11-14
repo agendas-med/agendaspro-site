@@ -1,6 +1,6 @@
 # agendaspro-site
 
-Site Vue 3 + Vite + Tailwind do AgendasPro. Regras de publicação e de interface da pasta pai: `../AGENTS.md`.
+Site Vue 3 + Vite + Tailwind do AgendasPro.
 
 Scripts: `dev` (`vite --host`), `build`, `preview`. Valide com `npm run build`.
 
