@@ -1,12 +1,13 @@
 <script setup>
 // /agendamento/:token — consultar, cancelar e remarcar um agendamento (link recebido na confirmação).
-// Os endpoints /public/bookings/:token* são ASSUMIDOS (ver mockApi.js); ajustar quando o core publicar o contrato.
+// Contrato: docs/contratos-f3.md do core (GET/cancel/reschedule por token; Pix do sinal enquanto pending_payment).
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { publicApi, friendlyError, ApiError } from '../services/publicApi.js'
 import { useSeo } from '../composables/useSeo.js'
 import { todayInTz, addDays, weekdayShort, dayOfMonth, monthShort, formatDateLong, formatLocalDateTime } from '../lib/datetime.js'
 import AppIcon from '../components/ui/AppIcon.vue'
+import PixPanel from '../components/booking/PixPanel.vue'
 
 useSeo({
   title: 'Meu agendamento | AgendasPro',
@@ -17,7 +18,7 @@ useSeo({
 const route = useRoute()
 const token = String(route.params.token)
 
-const state = ref('loading') // loading | ready | notfound | error
+const state = ref('loading') // loading | ready | notfound | expired | error
 const loadError = ref('')
 const data = ref(null)
 const booking = computed(() => data.value?.booking || null)
@@ -40,7 +41,25 @@ async function load() {
     state.value = 'ready'
   } catch (e) {
     loadError.value = friendlyError(e)
-    state.value = e instanceof ApiError && (e.status === 404 || e.status === 410) ? 'notfound' : 'error'
+    state.value =
+      e instanceof ApiError && (e.status === 410 || e.code === 'token_expired')
+        ? 'expired'
+        : e instanceof ApiError && e.status === 404
+          ? 'notfound'
+          : 'error'
+  }
+}
+
+// Recarrega o estado real do servidor (política mudou, Pix expirou, pagamento caiu...) sem derrubar a tela.
+async function refresh() {
+  try {
+    data.value = await publicApi.getBooking(token)
+  } catch (e) {
+    if (e instanceof ApiError && (e.status === 410 || e.code === 'token_expired')) {
+      loadError.value = friendlyError(e)
+      state.value = 'expired'
+    }
+    /* outros erros: mantém a tela atual */
   }
 }
 
@@ -52,7 +71,6 @@ const statusLabel = computed(
       pending_payment: 'Aguardando pagamento do sinal',
       cancelled: 'Cancelado',
       completed: 'Concluído',
-      no_show: 'Não compareceu',
     })[status.value] || status.value,
 )
 const statusClass = computed(
@@ -64,6 +82,17 @@ const statusClass = computed(
     })[status.value] || 'bg-slate-100 text-slate-700',
 )
 const active = computed(() => status.value === 'confirmed' || status.value === 'pending_payment')
+
+const CANCEL_REASONS = {
+  customer: 'Cancelado por você.',
+  company: 'Cancelado pelo estabelecimento.',
+  payment_expired: 'O prazo para pagar o sinal terminou e o horário foi liberado.',
+  payment_failed: 'Não foi possível gerar o Pix do sinal e o horário foi liberado.',
+  paid_after_expiry:
+    'O pagamento chegou depois do prazo e o horário já havia sido ocupado. Fale com o estabelecimento para o estorno.',
+}
+const cancelReasonText = computed(() => (status.value === 'cancelled' ? CANCEL_REASONS[booking.value?.cancellation_reason] || '' : ''))
+const rebookHref = computed(() => (company.value?.slug ? `/b/${encodeURIComponent(company.value.slug)}` : ''))
 
 function startCooldown(s) {
   cooldown.value = Math.max(1, Math.min(Number(s) || 15, 120))
@@ -77,6 +106,31 @@ function startCooldown(s) {
 function handleActionError(e) {
   actionError.value = friendlyError(e)
   if (e instanceof ApiError && e.status === 429) startCooldown(e.retryAfter)
+  // A política/estado mudou no servidor: volta para a visualização com os dados atualizados.
+  if (e instanceof ApiError && (e.code === 'not_allowed' || e.code === 'cancel_window_closed')) {
+    mode.value = 'view'
+    refresh()
+  }
+}
+
+// Resposta de cancel/reschedule traz a visão completa ({booking, company?, policy?, payment?}); mescla sem perder o que faltar.
+function applyView(r, forced = {}) {
+  data.value = {
+    ...data.value,
+    ...(r?.company ? { company: r.company } : {}),
+    ...(r?.policy ? { policy: r.policy } : {}),
+    ...(r && 'payment' in r ? { payment: r.payment } : {}),
+    booking: { ...data.value.booking, ...(r?.booking || {}), ...forced },
+  }
+}
+
+function onPixConfirmed(b) {
+  applyView({ booking: b }, { status: 'confirmed' })
+  notice.value = 'Pagamento identificado. Seu agendamento está confirmado.'
+  refresh() // política (cancelar/remarcar) muda após confirmar
+}
+function onPixClosed() {
+  refresh() // expirou/cancelou: traz status e cancellation_reason reais
 }
 
 async function focusHeading() {
@@ -91,13 +145,13 @@ async function cancel() {
   actionError.value = ''
   try {
     const r = await publicApi.cancelBooking(token)
-    data.value = { ...data.value, booking: { ...data.value.booking, ...(r?.booking || {}), status: 'cancelled' } }
+    applyView(r, { status: 'cancelled' })
     notice.value = 'Agendamento cancelado. O horário foi liberado.'
     mode.value = 'view'
     focusHeading()
   } catch (e) {
     if (e instanceof ApiError && e.code === 'already_cancelled') {
-      data.value = { ...data.value, booking: { ...data.value.booking, status: 'cancelled' } }
+      applyView(null, { status: 'cancelled' })
       mode.value = 'view'
     }
     handleActionError(e)
@@ -119,7 +173,7 @@ async function fetchWindow(reset) {
   const from = reset ? todayInTz(tz.value) : addDays(lastTo, 1)
   const to = addDays(from, 13)
   const r = await publicApi.getAvailability(company.value.slug, {
-    serviceId: booking.value.service_ids?.[0],
+    serviceIds: booking.value.service_ids || [],
     professionalId: booking.value.professional_id || undefined,
     from,
     to,
@@ -168,7 +222,7 @@ async function reschedule() {
   actionError.value = ''
   try {
     const r = await publicApi.rescheduleBooking(token, `${selDate.value}T${selTime.value}`)
-    data.value = { ...data.value, booking: { ...data.value.booking, ...(r?.booking || {}) } }
+    applyView(r)
     notice.value = 'Agendamento remarcado. Você receberá a nova confirmação pelo WhatsApp.'
     mode.value = 'view'
     focusHeading()
@@ -202,9 +256,17 @@ onBeforeUnmount(() => clearInterval(cooldownTimer))
     </div>
 
     <main v-else-if="state !== 'ready'" id="conteudo" class="mx-auto max-w-xl p-6 text-center">
-      <h1 class="text-2xl">{{ state === 'notfound' ? 'Agendamento não encontrado' : 'Não foi possível carregar' }}</h1>
+      <h1 class="text-2xl">
+        {{ state === 'notfound' ? 'Agendamento não encontrado' : state === 'expired' ? 'Este link expirou' : 'Não foi possível carregar' }}
+      </h1>
       <p class="mt-3 text-[var(--color-ink-soft)]">
-        {{ state === 'notfound' ? 'O link pode estar incompleto ou ter expirado. Confira a mensagem de confirmação ou fale com o estabelecimento.' : loadError }}
+        {{
+          state === 'notfound'
+            ? 'O link pode estar incompleto. Confira a mensagem de confirmação ou fale com o estabelecimento.'
+            : state === 'expired'
+              ? 'O link de acesso a este agendamento não vale mais. Para consultar ou alterar o horário, fale com o estabelecimento.'
+              : loadError
+        }}
       </p>
       <button v-if="state === 'error'" type="button" class="btn btn-primary mt-6" @click="load">Tentar de novo</button>
       <RouterLink v-else to="/" class="btn btn-outline mt-6">Ir para o início</RouterLink>
@@ -223,6 +285,7 @@ onBeforeUnmount(() => clearInterval(cooldownTimer))
         <p class="mt-3 font-semibold">{{ (booking.service_names || []).join(', ') }}</p>
         <p class="text-[var(--color-ink-soft)]">{{ formatLocalDateTime(booking.start) }}</p>
         <p v-if="booking.professional_name" class="text-[var(--color-ink-soft)]">com {{ booking.professional_name }}</p>
+        <p v-if="cancelReasonText" class="mt-2 text-sm text-[var(--color-ink-soft)]">{{ cancelReasonText }}</p>
         <p v-if="company.address" class="mt-2 flex items-start gap-2 text-sm text-[var(--color-ink-soft)]">
           <AppIcon name="pin" :size="16" class="mt-0.5 shrink-0" /> {{ company.address }}
         </p>
@@ -234,6 +297,18 @@ onBeforeUnmount(() => clearInterval(cooldownTimer))
       <p v-if="actionError" class="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800" role="alert">
         {{ actionError }}<template v-if="cooldown > 0"> Tente de novo em {{ cooldown }}s.</template>
       </p>
+
+      <!-- Pix do sinal enquanto aguarda pagamento -->
+      <div v-if="status === 'pending_payment' && mode === 'view'" class="mt-5">
+        <PixPanel
+          :payment="data.payment || {}"
+          :token="token"
+          @confirmed="onPixConfirmed"
+          @expired="onPixClosed"
+          @cancelled="onPixClosed"
+          @retry="rebookHref && $router.push(rebookHref)"
+        />
+      </div>
 
       <!-- visualização -->
       <section v-if="mode === 'view'" class="mt-5">
@@ -253,7 +328,10 @@ onBeforeUnmount(() => clearInterval(cooldownTimer))
             Alterações são permitidas com pelo menos {{ policy.min_notice_hours }}h de antecedência.
           </p>
         </template>
-        <p v-else class="text-sm text-[var(--color-ink-soft)]">Este agendamento não pode mais ser alterado.</p>
+        <template v-else>
+          <p class="text-sm text-[var(--color-ink-soft)]">Este agendamento não pode mais ser alterado.</p>
+          <RouterLink v-if="status === 'cancelled' && rebookHref" :to="rebookHref" class="btn btn-primary mt-4">Agendar novo horário</RouterLink>
+        </template>
       </section>
 
       <!-- confirmar cancelamento -->

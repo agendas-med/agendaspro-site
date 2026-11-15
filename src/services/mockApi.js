@@ -1,9 +1,13 @@
-// Backend fictício para desenvolver e testar a UI sem o core (VITE_USE_MOCKS=true).
-// Simula os contratos /public/* do LAUNCH-PLAN. Todos os dados são FICTÍCIOS (sem pessoas/números reais).
+// Backend fictício para desenvolver e testar a UI sem o core (VITE_USE_MOCK=true, SÓ em dev/teste).
+// Simula o contrato /public/* (agendaspro-core/docs/contratos-f3.md). Dados FICTÍCIOS (sem pessoas/números reais).
+// Este módulo só entra no bundle via import dinâmico atrás de import.meta.env.DEV (nunca vai à produção).
 //
 // Gatilhos determinísticos (use no campo "nome" do cliente ao agendar):
-//   "conflito" -> 409 slot_taken   "limite" -> 429 rate_limited   "erro" -> 500   "rede" -> falha de rede
-//   "expira"   -> Pix que expira em 25 s e nunca é pago
+//   "conflito"   -> 409 slot_taken        "limite"   -> 429 rate_limited     "erro"   -> 500   "rede" -> falha de rede
+//   "pagamento"  -> 503 payment_unavailable  "indisponivel" -> 503 service_unavailable  "grande" -> 413 payload_too_large
+//   "expira"     -> Pix que expira em 25 s e nunca é pago (cancelled/payment_expired na leitura seguinte)
+//   "janela"     -> reserva dentro do prazo mínimo: cancelar/remarcar dá 409 cancel_window_closed
+//   "linkvencido"-> o link de gestão devolve 410 token_expired
 // Serviços com requires_payment geram Pix; o Pix de exemplo é "pago" automaticamente após ~12 s.
 import { ApiError } from './apiError.js'
 import { addDays, todayInTz } from '../lib/datetime.js'
@@ -63,6 +67,7 @@ const BUSINESSES = {
 
 // Estado em memória do mock (apenas dev/teste)
 const store = { bookings: new Map(), taken: new Set(), seq: 1000, byKey: new Map() }
+const MIN_NOTICE_HOURS = 2
 
 export function resetMock() {
   store.bookings.clear()
@@ -100,9 +105,9 @@ function slotKey(slug, profId, start) {
   return `${slug}|${profId}|${start}`
 }
 
-function slotsForDay(slug, biz, date, serviceId, professionalId) {
+function slotsForDay(slug, biz, date, serviceIds, professionalId) {
   if (biz.company.slug === 'barbearia-exemplo' ? dayOfWeek(date) === 0 || dayOfWeek(date) === 1 : dayOfWeek(date) === 0 || dayOfWeek(date) === 6) return []
-  const profs = biz.professionals.filter((p) => p.service_ids.includes(serviceId) && (!professionalId || p.id === professionalId))
+  const profs = biz.professionals.filter((p) => serviceIds.every((id) => p.service_ids.includes(id)) && (!professionalId || p.id === professionalId))
   const now = nowParts()
   const out = []
   for (let h = 9; h < 18; h++) {
@@ -142,12 +147,24 @@ function endOf(start, durationMin) {
   return `${date}T${addMinutes(time, durationMin)}`
 }
 
+function settle(b) {
+  // O core não tem cron: o vencimento do Pix é aplicado na leitura (cancelled/payment_expired e a vaga volta).
+  if (b.status !== 'pending_payment') return
+  if (b.payAt && Date.now() >= b.payAt) b.status = 'confirmed'
+  else if (b.payment?.expires_at && Date.now() >= Date.parse(b.payment.expires_at)) {
+    b.status = 'cancelled'
+    b.cancellation_reason = 'payment_expired'
+    store.taken.delete(slotKey(b.slug, b.professional_id, b.start))
+  }
+}
+
 function publicBooking(b) {
-  // confirma o Pix de exemplo depois de alguns segundos
-  if (b.status === 'pending_payment' && b.payAt && Date.now() >= b.payAt) b.status = 'confirmed'
+  settle(b)
   return {
     id: b.id,
     status: b.status,
+    ...(b.cancellation_reason ? { cancellation_reason: b.cancellation_reason } : {}),
+    deposit_cents: b.deposit_cents,
     start: b.start,
     end: b.end,
     service_ids: b.service_ids,
@@ -155,6 +172,11 @@ function publicBooking(b) {
     professional_id: b.professional_id,
     professional_name: b.professional_name,
   }
+}
+
+function bookingResponse(b, token) {
+  const booking = publicBooking(b)
+  return { booking, manage_token: token, ...(b.payment ? { payment: b.payment } : {}) }
 }
 
 function getBiz(slug) {
@@ -175,6 +197,15 @@ function checkTriggers(name) {
   if (n.includes('limite')) throw err(429, 'rate_limited', 'Muitas tentativas. Aguarde um instante.', { retryAfter: 30 })
   if (n.includes('erro')) throw err(500, 'internal_error', 'Erro interno simulado.')
   if (n.includes('conflito')) throw err(409, 'slot_taken', 'Horário indisponível.')
+  if (n.includes('pagamento')) throw err(503, 'payment_unavailable', 'Não foi possível gerar o Pix.')
+  if (n.includes('indisponivel')) throw err(503, 'service_unavailable', 'Serviço indisponível.')
+  if (n.includes('grande')) throw err(413, 'payload_too_large', 'Corpo da requisição grande demais.')
+}
+
+/** Impressão digital do payload (sem idempotency_key/turnstile_token): mesma chave + dados diferentes = conflito. */
+function fingerprint(body) {
+  const { idempotency_key, turnstile_token, ...rest } = body || {}
+  return JSON.stringify(rest, (k, v) => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).sort()) : v))
 }
 
 const delay = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -187,6 +218,7 @@ export async function handle(method, path, { query = {}, body = {} } = {}) {
   if (method === 'POST' && path === '/leads') {
     checkTriggers(body.name)
     if (!body.turnstile_token) throw err(400, 'turnstile_failed', 'Verificação de segurança falhou.')
+    if (!body.consent) throw err(400, 'consent_required', 'É necessário aceitar o tratamento de dados.')
     if (!body.name || !body.whatsapp || !body.segment) throw err(400, 'validation_error', 'Preencha nome, WhatsApp e segmento.')
     return { ok: true }
   }
@@ -199,14 +231,16 @@ export async function handle(method, path, { query = {}, body = {} } = {}) {
   if (method === 'GET' && (m = path.match(/^\/b\/([^/]+)\/availability$/))) {
     const slug = m[1]
     const biz = getBiz(slug)
-    const serviceId = Number(query.service_id)
-    if (!biz.services.some((s) => s.id === serviceId)) throw err(400, 'validation_error', 'Serviço inválido.')
+    const serviceIds = String(query.service_id ?? '').split(',').map((x) => Number(x.trim()))
+    if (!serviceIds.length || serviceIds.length > 5 || serviceIds.some((id) => !biz.services.some((s) => s.id === id))) {
+      throw err(400, 'validation_error', 'Serviço inválido.')
+    }
     const from = query.from
     const to = query.to
     if (!/^\d{4}-\d{2}-\d{2}$/.test(from || '') || !/^\d{4}-\d{2}-\d{2}$/.test(to || '')) throw err(400, 'validation_error', 'Período inválido.')
     const days = []
     for (let d = from, i = 0; d <= to && i < 14; d = addDays(d, 1), i++) {
-      days.push({ date: d, slots: slotsForDay(slug, biz, d, serviceId, query.professional_id ? Number(query.professional_id) : null) })
+      days.push({ date: d, slots: slotsForDay(slug, biz, d, serviceIds, query.professional_id ? Number(query.professional_id) : null) })
     }
     return { timezone: TZ, days }
   }
@@ -216,7 +250,12 @@ export async function handle(method, path, { query = {}, body = {} } = {}) {
     const biz = getBiz(slug)
     const { service_ids, professional_id, start, customer, consent, idempotency_key } = body
     if (!idempotency_key) throw err(400, 'validation_error', 'idempotency_key obrigatório.')
-    if (store.byKey.has(idempotency_key)) return store.byKey.get(idempotency_key)
+    const fp = fingerprint(body)
+    const prior = store.byKey.get(idempotency_key)
+    if (prior) {
+      if (prior.fp !== fp) throw err(409, 'idempotency_conflict', 'idempotency_key já usada com outros dados.')
+      return bookingResponse(prior.b, prior.token) // replay idempotente: 200 com a mesma reserva
+    }
     if (!body.turnstile_token) throw err(400, 'turnstile_failed', 'Verificação de segurança falhou.')
     checkTriggers(customer?.name)
     if (!consent) throw err(400, 'consent_required', 'É necessário aceitar o tratamento de dados.')
@@ -227,13 +266,18 @@ export async function handle(method, path, { query = {}, body = {} } = {}) {
     const key = slotKey(slug, prof.id, start)
     if (store.taken.has(key)) throw err(409, 'slot_taken', 'Horário indisponível.')
     store.taken.add(key)
-    const id = ++store.seq
-    const token = `mock.${id}.${hash(`${id}${start}`).toString(36)}`
+    const seq = ++store.seq
+    const id = `bk_${seq}`
+    const token = `v1.mock${seq}.${hash(`${seq}${start}`).toString(36)}.mock`
     const duration = services.reduce((a, s) => a + s.duration_min, 0)
     const needsPay = services.some((s) => s.requires_payment)
     const expiring = String(customer.name).toLowerCase().includes('expira')
+    const deposit = services.reduce((a, x) => a + (x.requires_payment ? x.deposit_cents : 0), 0)
     const booking = {
       id,
+      deposit_cents: deposit,
+      windowClosed: String(customer.name).toLowerCase().includes('janela'),
+      tokenExpired: String(customer.name).toLowerCase().includes('linkvencido'),
       slug,
       status: needsPay ? 'pending_payment' : 'confirmed',
       start,
@@ -244,37 +288,51 @@ export async function handle(method, path, { query = {}, body = {} } = {}) {
       professional_name: prof.name,
       payAt: needsPay && !expiring ? Date.now() + 12000 : null,
     }
-    store.bookings.set(token, booking)
-    const res = { booking: publicBooking(booking), manage_token: token }
     if (needsPay) {
-      res.payment = {
+      booking.payment = {
         provider: 'asaas',
+        amount_cents: deposit,
         pix_qr_base64: qrSvgDataUri(),
-        pix_copy_paste: `00020126EXEMPLO-FICTICIO-NAO-PAGAVEL${id}5204000053039865802BR`,
+        pix_copy_paste: `00020126EXEMPLO-FICTICIO-NAO-PAGAVEL${seq}5204000053039865802BR`,
         expires_at: new Date(Date.now() + (expiring ? 25000 : 15 * 60000)).toISOString(),
       }
     }
-    store.byKey.set(idempotency_key, res)
-    return res
+    store.bookings.set(token, booking)
+    store.byKey.set(idempotency_key, { fp, b: booking, token })
+    return bookingResponse(booking, token)
   }
 
   if ((m = path.match(/^\/bookings\/([^/]+)(\/cancel|\/reschedule)?$/))) {
     const b = findByToken(decodeURIComponent(m[1]))
+    if (b.tokenExpired) throw err(410, 'token_expired', 'Link expirado.')
     const biz = getBiz(b.slug)
-    const view = () => ({
-      booking: publicBooking(b),
-      company: { name: biz.company.name, slug: b.slug, address: biz.company.address, phone: biz.company.phone, timezone: TZ },
-      policy: { can_cancel: b.status !== 'cancelled', can_reschedule: b.status !== 'cancelled', min_notice_hours: 2 },
-    })
+    const view = () => {
+      const booking = publicBooking(b)
+      const active = booking.status === 'confirmed' || booking.status === 'pending_payment'
+      const open = active && !b.windowClosed
+      return {
+        booking,
+        company: { name: biz.company.name, slug: b.slug, address: biz.company.address, phone: biz.company.phone, timezone: TZ },
+        // Pix pendente: só enquanto aguarda pagamento (some ao confirmar/cancelar).
+        ...(booking.status === 'pending_payment' && b.payment ? { payment: b.payment } : {}),
+        policy: { can_cancel: open, can_reschedule: open && booking.status === 'confirmed', min_notice_hours: MIN_NOTICE_HOURS },
+      }
+    }
     if (method === 'GET' && !m[2]) return view()
     if (method === 'POST' && m[2] === '/cancel') {
+      settle(b)
       if (b.status === 'cancelled') throw err(409, 'already_cancelled', 'Este agendamento já foi cancelado.')
+      if (b.windowClosed) throw err(409, 'cancel_window_closed', 'Prazo para cancelar encerrado.')
       b.status = 'cancelled'
+      b.cancellation_reason = 'customer'
       store.taken.delete(slotKey(b.slug, b.professional_id, b.start))
       return view()
     }
     if (method === 'POST' && m[2] === '/reschedule') {
+      settle(b)
       if (b.status === 'cancelled') throw err(409, 'already_cancelled', 'Este agendamento foi cancelado.')
+      if (b.status !== 'confirmed') throw err(409, 'not_allowed', 'Este agendamento não pode ser remarcado.')
+      if (b.windowClosed) throw err(409, 'cancel_window_closed', 'Prazo para remarcar encerrado.')
       const start = body.start
       if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(start || '')) throw err(400, 'validation_error', 'Horário inválido.')
       const k = slotKey(b.slug, b.professional_id, start)

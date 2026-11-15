@@ -4,10 +4,14 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useHead } from '@unhead/vue'
-import { publicApi, friendlyError, newIdempotencyKey, ApiError } from '../services/publicApi.js'
+import { publicApi, friendlyError, isAmbiguousFailure, ApiError } from '../services/publicApi.js'
 import { track } from '../services/analytics.js'
 import { env } from '../config/env.js'
-import { maskPhoneBR, isValidWhatsappBR, toE164BR } from '../lib/phone.js'
+import { maskPhoneBR, isValidWhatsappBR } from '../lib/phone.js'
+import { maskCpf, isValidCpf } from '../lib/cpf.js'
+import { parseSource } from '../lib/source.js'
+import { createIdempotencyTracker } from '../lib/idempotency.js'
+import { buildBookingPayload } from '../lib/bookingPayload.js'
 import { formatBRL } from '../lib/commission.js'
 import { todayInTz, addDays, weekdayShort, dayOfMonth, monthShort, formatDateLong, formatLocalDateTime } from '../lib/datetime.js'
 import TurnstileWidget from '../components/ui/TurnstileWidget.vue'
@@ -16,8 +20,7 @@ import AppIcon from '../components/ui/AppIcon.vue'
 
 const route = useRoute()
 const slug = String(route.params.slug)
-const SOURCES = ['instagram', 'qr', 'link', 'whatsapp', 'site']
-const source = SOURCES.includes(String(route.query.src || '').toLowerCase()) ? String(route.query.src).toLowerCase() : 'link'
+const source = parseSource(route.query) // link | instagram | qr | whatsapp | site
 
 // ---------- dados da empresa ----------
 const loadState = ref('loading') // loading | ready | notfound | error
@@ -97,7 +100,6 @@ function chooseService(s) {
   sel.slot = null
   sel.date = ''
   days.value = []
-  idemKey.value = newIdempotencyKey()
   const eligible = (data.value?.professionals || []).filter((p) => p.service_ids.includes(s.id))
   if (eligible.length === 1) {
     sel.professionalId = eligible[0].id
@@ -113,7 +115,6 @@ function chooseProfessional(id) {
   sel.slot = null
   sel.date = ''
   days.value = []
-  idemKey.value = newIdempotencyKey()
   go(3)
   loadAvailability(true)
 }
@@ -166,25 +167,28 @@ const daySlots = computed(() => {
 
 function pickSlot(s) {
   sel.slot = { date: sel.date, time: s.start, professional_id: s.professional_id }
-  idemKey.value = newIdempotencyKey()
 }
 
 // ---------- dados do cliente ----------
-const form = reactive({ name: '', phone: '', email: '', consent: false })
-const errors = reactive({ name: '', phone: '', email: '', consent: '' })
+const form = reactive({ name: '', phone: '', email: '', cpf: '', consent: false })
+const errors = reactive({ name: '', phone: '', email: '', cpf: '', consent: '' })
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
 const turnstile = ref(null)
+const tsToken = ref('') // envio liberado só com token do Turnstile (ou bypass explícito de dev)
+const needsDeposit = (s) => Boolean(s?.requires_payment && s.deposit_cents > 0)
 
 function validateForm() {
   errors.name = form.name.trim().length >= 2 ? '' : 'Informe o seu nome.'
   errors.phone = isValidWhatsappBR(form.phone) ? '' : 'Informe um WhatsApp válido com DDD.'
   errors.email = !form.email || EMAIL_RE.test(form.email.trim()) ? '' : 'E-mail inválido. Corrija ou deixe em branco.'
+  errors.cpf = !form.cpf || isValidCpf(form.cpf) ? '' : 'CPF inválido. Confira os números ou deixe em branco.'
   errors.consent = form.consent ? '' : 'Para agendar é preciso concordar com o tratamento dos dados.'
-  return !errors.name && !errors.phone && !errors.email && !errors.consent
+  return !errors.name && !errors.phone && !errors.email && !errors.cpf && !errors.consent
 }
 
 // ---------- envio ----------
-const idemKey = ref(newIdempotencyKey())
+// A chave é gerada por tentativa e reaproveitada no retry do MESMO payload (rede/5xx/429); muda se os dados mudam.
+const idem = createIdempotencyTracker()
 const submitting = ref(false)
 const submitError = ref('')
 const cooldown = ref(0)
@@ -213,33 +217,37 @@ async function submit() {
   if (submitting.value || cooldown.value > 0) return
   submitError.value = ''
   if (!validateForm()) {
-    const first = ['name', 'phone', 'email', 'consent'].find((k) => errors[k])
+    const first = ['name', 'phone', 'email', 'cpf', 'consent'].find((k) => errors[k])
     document.getElementById(`bk-${first}`)?.focus()
+    return
+  }
+  const token = turnstile.value?.getToken() || ''
+  if (!token) {
+    submitError.value = 'Aguarde a verificação de segurança terminar e tente de novo.'
     return
   }
   submitting.value = true
   try {
-    const res = await publicApi.createBooking(slug, {
-      service_ids: [sel.service.id],
-      professional_id: sel.slot.professional_id ?? sel.professionalId ?? null,
-      start: `${sel.slot.date}T${sel.slot.time}`,
-      customer: {
-        name: form.name.trim(),
-        phone: toE164BR(form.phone),
-        ...(form.email.trim() ? { email: form.email.trim() } : {}),
-      },
-      consent: true,
+    const payload = buildBookingPayload({
+      serviceIds: [sel.service.id],
+      professionalId: sel.professionalId,
+      slot: sel.slot,
+      form: needsDeposit(sel.service) ? form : { ...form, cpf: '' },
       source,
-      idempotency_key: idemKey.value,
-      turnstile_token: turnstile.value?.getToken() || '',
     })
+    const res = await publicApi.createBooking(slug, {
+      ...payload,
+      idempotency_key: idem.keyFor(payload),
+      turnstile_token: token,
+    })
+    idem.reset()
     result.value = res
     if (res.booking?.status === 'confirmed') trackConfirmed(false)
     await go(5)
   } catch (e) {
     if (e instanceof ApiError && e.code === 'slot_taken') {
       // horário ocupado: nova chave, volta para a escolha de horário com a agenda atualizada
-      idemKey.value = newIdempotencyKey()
+      idem.reset()
       sel.slot = null
       submitError.value = friendlyError(e)
       await go(3)
@@ -248,9 +256,9 @@ async function submit() {
       submitError.value = friendlyError(e)
       startCooldown(e.retryAfter)
     } else {
-      // falha de rede/5xx: mantém a mesma idempotency_key para não duplicar se o servidor chegou a gravar
+      // rede/timeout/5xx: mantém a idempotency_key (o servidor pode ter gravado). Falha definitiva: chave nova.
       submitError.value = friendlyError(e)
-      if (e instanceof ApiError && e.status >= 400 && e.status < 500) idemKey.value = newIdempotencyKey()
+      if (!isAmbiguousFailure(e)) idem.reset()
     }
   } finally {
     submitting.value = false
@@ -265,7 +273,7 @@ async function pickAnotherTime() {
   confirmedTracked.value = false
   result.value = null
   sel.slot = null
-  idemKey.value = newIdempotencyKey()
+  idem.reset()
   submitError.value = ''
   await go(3)
   await loadAvailability(true)
@@ -275,10 +283,16 @@ function onPixConfirmed(booking) {
   if (result.value) result.value = { ...result.value, booking: { ...result.value.booking, ...booking, status: 'confirmed' } }
   trackConfirmed(true)
 }
+function onPixCancelled() {
+  if (result.value) result.value = { ...result.value, booking: { ...result.value.booking, status: 'cancelled' } }
+}
 
 // ---------- confirmação ----------
 const isPending = computed(() => result.value?.booking?.status === 'pending_payment')
-const showPix = computed(() => isPending.value && result.value?.payment && !pixExpired.value)
+const isCancelled = computed(() => result.value?.booking?.status === 'cancelled')
+// pending_payment sempre mostra o painel; sem `payment` (Pix ainda sendo gerado) ele busca pelo token.
+const showPix = computed(() => isPending.value)
+const outcome = computed(() => (isCancelled.value ? 'cancelled' : pixExpired.value ? 'expired' : isPending.value ? 'pending' : 'confirmed'))
 const manageHref = computed(() => `/agendamento/${encodeURIComponent(result.value?.manage_token || '')}`)
 const manageUrl = computed(() => (typeof window === 'undefined' ? manageHref.value : `${window.location.origin}${manageHref.value}`))
 const linkCopied = ref(false)
@@ -294,7 +308,7 @@ async function copyManageLink() {
 
 const slotLabel = computed(() => (sel.slot ? formatLocalDateTime(`${sel.slot.date}T${sel.slot.time}`) : ''))
 const summaryProf = computed(() => profName(sel.slot?.professional_id ?? sel.professionalId))
-const depositText = (s) => (s.requires_payment && s.deposit_cents > 0 ? `Sinal de ${formatBRL(s.deposit_cents)} via Pix` : '')
+const depositText = (s) => (needsDeposit(s) ? `Sinal de ${formatBRL(s.deposit_cents)} via Pix` : '')
 
 onMounted(load)
 onBeforeUnmount(() => clearInterval(cooldownTimer))
@@ -500,7 +514,29 @@ onBeforeUnmount(() => clearInterval(cooldownTimer))
               <p v-if="errors.consent" id="bk-consent-err" class="field-error">{{ errors.consent }}</p>
             </div>
 
-            <TurnstileWidget ref="turnstile" />
+            <div v-if="needsDeposit(sel.service)">
+              <label for="bk-cpf" class="field-label">CPF <span class="font-normal text-[var(--color-ink-soft)]">(opcional, usado só para gerar o Pix)</span></label>
+              <input
+                id="bk-cpf"
+                :value="form.cpf"
+                class="field"
+                type="text"
+                inputmode="numeric"
+                autocomplete="off"
+                placeholder="000.000.000-00"
+                :aria-invalid="Boolean(errors.cpf)"
+                :aria-describedby="errors.cpf ? 'bk-cpf-err' : undefined"
+                @input="form.cpf = maskCpf($event.target.value)"
+              />
+              <p v-if="errors.cpf" id="bk-cpf-err" class="field-error">{{ errors.cpf }}</p>
+            </div>
+
+            <TurnstileWidget
+              ref="turnstile"
+              @token="tsToken = $event"
+              @expired="tsToken = ''"
+              @error="tsToken = ''"
+            />
 
             <p v-if="submitError" class="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800" role="alert">
               {{ submitError }}<template v-if="cooldown > 0"> Tente de novo em {{ cooldown }}s.</template>
@@ -508,8 +544,8 @@ onBeforeUnmount(() => clearInterval(cooldownTimer))
 
             <div class="flex items-center gap-3">
               <button type="button" class="bk-back mt-0" :disabled="submitting" @click="go(3)">Voltar</button>
-              <button type="submit" class="bk-primary flex-1" :disabled="submitting || cooldown > 0" :aria-busy="submitting">
-                {{ submitting ? 'Agendando...' : cooldown > 0 ? `Aguarde ${cooldown}s` : sel.service.requires_payment && sel.service.deposit_cents > 0 ? 'Agendar e pagar sinal' : 'Confirmar agendamento' }}
+              <button type="submit" class="bk-primary flex-1" :disabled="submitting || cooldown > 0 || !tsToken" :aria-busy="submitting">
+                {{ submitting ? 'Agendando...' : cooldown > 0 ? `Aguarde ${cooldown}s` : needsDeposit(sel.service) ? 'Agendar e pagar sinal' : 'Confirmar agendamento' }}
               </button>
             </div>
           </form>
@@ -518,14 +554,14 @@ onBeforeUnmount(() => clearInterval(cooldownTimer))
         <!-- 5: confirmação -->
         <section v-else aria-labelledby="bk-h5">
           <div class="text-center">
-            <span class="mx-auto grid h-14 w-14 place-items-center rounded-full" :class="isPending && !pixExpired ? 'bg-amber-100 text-amber-700' : 'bk-ok'">
-              <AppIcon :name="isPending && !pixExpired ? 'clock' : pixExpired ? 'alert' : 'check'" :size="28" />
+            <span class="mx-auto grid h-14 w-14 place-items-center rounded-full" :class="outcome === 'pending' ? 'bg-amber-100 text-amber-700' : outcome === 'confirmed' ? 'bk-ok' : 'bg-red-100 text-red-700'">
+              <AppIcon :name="outcome === 'pending' ? 'clock' : outcome === 'confirmed' ? 'check' : 'alert'" :size="28" />
             </span>
             <h1 id="bk-h5" ref="stepHeading" tabindex="-1" class="mt-3 text-2xl outline-none">
-              {{ pixExpired ? 'Prazo do Pix encerrado' : isPending ? 'Falta pagar o sinal' : 'Agendamento confirmado!' }}
+              {{ outcome === 'expired' ? 'Prazo do Pix encerrado' : outcome === 'cancelled' ? 'Agendamento não concluído' : outcome === 'pending' ? 'Falta pagar o sinal' : 'Agendamento confirmado!' }}
             </h1>
             <p class="mt-1 text-[var(--color-ink-soft)]">
-              {{ pixExpired ? 'O horário foi liberado.' : isPending ? 'Seu horário fica reservado até o fim do prazo do Pix.' : 'Enviaremos a confirmação e os lembretes pelo WhatsApp.' }}
+              {{ outcome === 'expired' || outcome === 'cancelled' ? 'O horário foi liberado.' : outcome === 'pending' ? 'Seu horário fica reservado até o fim do prazo do Pix.' : 'Enviaremos a confirmação e os lembretes pelo WhatsApp.' }}
             </p>
           </div>
 
@@ -537,10 +573,17 @@ onBeforeUnmount(() => clearInterval(cooldownTimer))
           </div>
 
           <div v-if="showPix" class="mt-5">
-            <PixPanel :payment="result.payment" :token="result.manage_token" :amount-cents="sel.service.deposit_cents" @confirmed="onPixConfirmed" @expired="pixExpired = true" />
+            <PixPanel
+              :payment="result.payment || {}"
+              :token="result.manage_token"
+              @confirmed="onPixConfirmed"
+              @expired="pixExpired = true"
+              @cancelled="onPixCancelled"
+              @retry="pickAnotherTime"
+            />
           </div>
 
-          <div v-if="!pixExpired" class="mt-5 rounded-xl border border-[var(--color-line)] bg-white p-4 text-sm">
+          <div v-if="outcome === 'pending' || outcome === 'confirmed'" class="mt-5 rounded-xl border border-[var(--color-line)] bg-white p-4 text-sm">
             <p class="font-semibold">Precisa remarcar ou cancelar?</p>
             <p class="mt-1 text-[var(--color-ink-soft)]">Guarde o link do seu agendamento. Com ele você consulta, remarca ou cancela.</p>
             <p class="mt-2 break-all rounded-lg bg-slate-100 px-2 py-1.5 font-mono text-xs">{{ manageUrl }}</p>
@@ -550,10 +593,10 @@ onBeforeUnmount(() => clearInterval(cooldownTimer))
             </div>
             <p class="sr-only" role="status" aria-live="polite">{{ linkCopied ? 'Link copiado' : '' }}</p>
           </div>
-          <button v-else type="button" class="bk-primary mt-5" @click="pickAnotherTime">Escolher outro horário</button>
+          <button v-else-if="outcome === 'cancelled'" type="button" class="bk-primary mt-5" @click="pickAnotherTime">Escolher outro horário</button>
         </section>
 
-        <footer v-if="company.powered_by" class="mt-10 text-center text-xs text-[var(--color-ink-soft)]">
+        <footer v-if="company.powered_by !== false" class="mt-10 text-center text-xs text-[var(--color-ink-soft)]">
           Feito com
           <a :href="`${env.siteUrl}/?utm_source=booking_page&utm_medium=powered_by&utm_campaign=${encodeURIComponent(company.slug)}`" target="_blank" rel="noopener" class="font-semibold underline">AgendasPro<span class="sr-only"> (abre em nova aba)</span></a>
         </footer>
