@@ -3,8 +3,9 @@
 // estados de carregando/erro/sucesso. Evento generate_lead no sucesso.
 import { computed, reactive, ref } from 'vue'
 import { niches } from '../../data/niches.js'
-import { maskPhoneBR, isValidWhatsappBR, toE164BR } from '../../lib/phone.js'
+import { maskPhoneBR, isValidWhatsappBR } from '../../lib/phone.js'
 import { publicApi, friendlyError } from '../../services/publicApi.js'
+import { buildLeadPayload } from '../../lib/bookingPayload.js'
 import { track } from '../../services/analytics.js'
 import { useAttribution } from '../../composables/useAttribution.js'
 import TurnstileWidget from '../ui/TurnstileWidget.vue'
@@ -16,12 +17,13 @@ const props = defineProps({
 })
 
 const attribution = useAttribution()
-const form = reactive({ name: '', whatsapp: '', email: '', segment: props.defaultSegment, message: '', website: '' })
-const errors = reactive({ name: '', whatsapp: '', email: '', segment: '' })
+const form = reactive({ name: '', whatsapp: '', email: '', segment: props.defaultSegment, message: '', website: '', consent: false })
+const errors = reactive({ name: '', whatsapp: '', email: '', segment: '', consent: '' })
 const status = ref('idle') // idle | loading | success | error
 const errorMsg = ref('')
 const turnstile = ref(null)
 const turnstileFailed = ref(false)
+const tsToken = ref('') // o envio só é liberado com um token válido (reset() devolve outro de forma assíncrona)
 
 const segments = [...niches.map((n) => ({ value: n.slug, label: n.name })), { value: 'outro', label: 'Outro segmento' }]
 const id = (n) => `${props.idPrefix}-${n}`
@@ -38,7 +40,8 @@ function validate() {
   errors.whatsapp = isValidWhatsappBR(form.whatsapp) ? '' : 'Informe um WhatsApp válido com DDD, ex.: (11) 91234-5678.'
   errors.email = !form.email || EMAIL_RE.test(form.email.trim()) ? '' : 'Informe um e-mail válido ou deixe em branco.'
   errors.segment = form.segment ? '' : 'Escolha o segmento do seu negócio.'
-  return !errors.name && !errors.whatsapp && !errors.email && !errors.segment
+  errors.consent = form.consent ? '' : 'Para receber o contato é preciso concordar com o uso dos dados.'
+  return !errors.name && !errors.whatsapp && !errors.email && !errors.segment && !errors.consent
 }
 
 async function submit() {
@@ -46,7 +49,7 @@ async function submit() {
   errorMsg.value = ''
   if (!validate()) {
     status.value = 'idle'
-    const first = ['name', 'whatsapp', 'email', 'segment'].find((k) => errors[k])
+    const first = ['name', 'whatsapp', 'email', 'segment', 'consent'].find((k) => errors[k])
     document.getElementById(id(first))?.focus()
     return
   }
@@ -55,17 +58,18 @@ async function submit() {
     status.value = 'success'
     return
   }
+  if (!tsToken.value) {
+    errorMsg.value = turnstileFailed.value
+      ? 'A verificação de segurança não está disponível. Recarregue a página e tente de novo.'
+      : 'Aguarde a verificação de segurança terminar e envie de novo.'
+    status.value = 'error'
+    return
+  }
   status.value = 'loading'
   try {
-    await publicApi.createLead({
-      name: form.name.trim(),
-      whatsapp: toE164BR(form.whatsapp),
-      ...(form.email.trim() ? { email: form.email.trim() } : {}),
-      segment: form.segment,
-      source: attribution.value ? `site:${attribution.value}` : 'site',
-      ...(form.message.trim() ? { message: form.message.trim() } : {}),
-      turnstile_token: turnstile.value?.getToken() || '',
-    })
+    await publicApi.createLead(
+      buildLeadPayload({ form, attribution: attribution.value, token: turnstile.value?.getToken() || '' }),
+    )
     track('generate_lead', { location: props.location, segment: form.segment })
     status.value = 'success'
   } catch (e) {
@@ -157,18 +161,33 @@ async function submit() {
         <textarea :id="id('message')" v-model="form.message" class="field" name="message" rows="3" maxlength="1000" />
       </div>
 
+      <div>
+        <label class="flex items-start gap-3 text-sm">
+          <input :id="id('consent')" v-model="form.consent" type="checkbox" class="mt-1 h-5 w-5 shrink-0" :aria-invalid="Boolean(errors.consent)" :aria-describedby="errors.consent ? id('consent-err') : undefined" />
+          <span>
+            Concordo em ser contatado(a) pelo AgendasPro por WhatsApp, e-mail ou telefone sobre este pedido, conforme a
+            <RouterLink to="/privacidade" target="_blank" class="underline">Política de Privacidade<span class="sr-only"> (abre em nova aba)</span></RouterLink>.
+          </span>
+        </label>
+        <p v-if="errors.consent" :id="id('consent-err')" class="field-error">{{ errors.consent }}</p>
+      </div>
+
       <!-- Honeypot: invisível para pessoas e leitores de tela; robôs costumam preencher. -->
       <div aria-hidden="true" style="position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden">
         <label :for="id('website')">Não preencha este campo</label>
         <input :id="id('website')" v-model="form.website" type="text" name="website" tabindex="-1" autocomplete="off" />
       </div>
 
-      <TurnstileWidget ref="turnstile" @error="turnstileFailed = true" @token="turnstileFailed = false" />
-      <p v-if="turnstileFailed" class="field-error">Não foi possível carregar a verificação de segurança. Recarregue a página e tente de novo.</p>
+      <TurnstileWidget
+        ref="turnstile"
+        @token="((tsToken = $event), (turnstileFailed = false))"
+        @expired="tsToken = ''"
+        @error="((tsToken = ''), (turnstileFailed = true))"
+      />
 
       <p v-if="status === 'error'" class="field-error" role="alert">{{ errorMsg }}</p>
 
-      <button type="submit" class="btn btn-primary btn-lg w-full" :disabled="loading" :aria-busy="loading">
+      <button type="submit" class="btn btn-primary btn-lg w-full" :disabled="loading || !tsToken" :aria-busy="loading">
         {{ loading ? 'Enviando...' : 'Quero conhecer o AgendasPro' }}
       </button>
       <p class="text-xs text-[var(--color-ink-soft)]">
