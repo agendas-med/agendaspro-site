@@ -1,0 +1,151 @@
+// Recursos anunciados. `status: 'soon'` exibe o selo "Em breve" em todo o site; o dono pode virar
+// para 'available' conforme cada recurso for liberado (nada anunciado fora do LAUNCH-PLAN).
+
+/** @type {{id:string,title:string,short:string,long:string,status:'available'|'soon',plan:'all'|'premium',icon:string}[]} */
+export const features = [
+  {
+    id: 'agenda',
+    title: 'Agenda por profissional',
+    short: 'Cada profissional com a sua agenda, horários e bloqueios.',
+    long: 'Defina os horários de atendimento de cada profissional, bloqueie folgas e intervalos e veja o dia da equipe numa única tela. Chega de caderno e de planilha.',
+    status: 'available',
+    plan: 'all',
+    icon: 'calendar',
+  },
+  {
+    id: 'public-page',
+    title: 'Página pública de agendamento',
+    short: 'Um link (e QR Code) para o cliente marcar sozinho, a qualquer hora.',
+    long: 'Cada negócio ganha uma página própria em /b/seu-negocio. Compartilhe no Instagram, na bio, no cartão ou no balcão com um QR Code. O cliente escolhe serviço, profissional e horário em poucos toques, no celular.',
+    status: 'available',
+    plan: 'all',
+    icon: 'link',
+  },
+  {
+    id: 'whatsapp-reminders',
+    title: 'Lembretes e confirmações no WhatsApp',
+    short: 'Mensagens automáticas antes do horário para o cliente confirmar ou avisar.',
+    long: 'O cliente recebe a confirmação do agendamento e um lembrete antes do horário, direto no WhatsApp. Quem não vai poder comparecer avisa com antecedência e a vaga volta para a agenda.',
+    status: 'available',
+    plan: 'all',
+    icon: 'whatsapp',
+  },
+  {
+    id: 'ai-whatsapp',
+    title: 'Recepção com IA no WhatsApp, 24h',
+    short: 'Uma assistente que conversa e agenda pelo WhatsApp, inclusive de madrugada.',
+    long: 'O cliente escreve como sempre escreveu. A assistente entende o pedido, consulta a sua agenda real e propõe horários. Quando a conversa foge do básico, ela passa para a sua equipe.',
+    status: 'available',
+    plan: 'all',
+    icon: 'bot',
+  },
+  {
+    id: 'pix-deposit',
+    title: 'Cobrança de sinal por Pix',
+    short: 'O horário só fica garantido depois do sinal pago, via Asaas.',
+    long: 'Defina um sinal por serviço. No agendamento o cliente recebe um QR Code Pix, paga e o horário é confirmado automaticamente. Menos faltas, mais previsibilidade de caixa.',
+    status: 'available',
+    plan: 'all',
+    icon: 'pix',
+  },
+  {
+    id: 'reports',
+    title: 'Relatórios',
+    short: 'Agendamentos, comparecimento e faturamento por período e por profissional.',
+    long: 'Acompanhe quantos clientes agendaram, compareceram ou faltaram e como evolui o seu faturamento. No Premium, relatórios avançados com exportação em CSV e histórico ilimitado.',
+    status: 'available',
+    plan: 'all',
+    icon: 'chart',
+  },
+  {
+    id: 'team',
+    title: 'Equipe e permissões',
+    short: 'Convide recepção e profissionais para o painel.',
+    long: 'Mais de uma pessoa organizando a agenda sem perder o controle. O Free inclui 2 usuários; o Premium não limita a equipe.',
+    status: 'available',
+    plan: 'all',
+    icon: 'team',
+  },
+  {
+    id: 'retention',
+    title: 'Lista de espera, reativação e avaliações',
+    short: 'Preencha vagas que abrem, traga inativos de volta e peça avaliação no Google.',
+    long: 'Cancelou? Quem está na lista de espera é avisado. Clientes que sumiram recebem um convite para voltar e, depois do atendimento, uma pesquisa de satisfação que pode virar avaliação no Google.',
+    status: 'soon',
+    plan: 'premium',
+    icon: 'users',
+  },
+  {
+    id: 'instagram',
+    title: 'Dashboard do Instagram',
+    short: 'Métricas, posts, engajamento e quantos agendamentos vieram do perfil.',
+    long: 'Conecte o perfil do negócio e veja no mesmo painel o que o Instagram está trazendo de agendamentos.',
+    status: 'soon',
+    plan: 'premium',
+    icon: 'instagram',
+  },
+  {
+    id: 'google-calendar',
+    title: 'Google Agenda',
+    short: 'Seus agendamentos aparecendo na agenda que você já usa.',
+    long: 'Sincronize a agenda dos profissionais com o Google Agenda para ver os compromissos no celular sem abrir outro aplicativo.',
+    status: 'soon',
+    plan: 'premium',
+    icon: 'google',
+  },
+  {
+    id: 'internal-ai',
+    title: 'Assistente de IA no painel',
+    short: 'Pergunte à IA sobre a sua agenda e peça ações com confirmação.',
+    long: 'Consulte a agenda em linguagem natural. No Premium a assistente também executa ações, sempre depois da sua confirmação.',
+    status: 'soon',
+    plan: 'premium',
+    icon: 'sparkles',
+  },
+]
+
+export const featureById = Object.fromEntries(features.map((f) => [f.id, f]))
+export const coreFeatureIds = ['agenda', 'public-page', 'whatsapp-reminders', 'ai-whatsapp', 'pix-deposit', 'reports']
+
+export const integrations = [
+  {
+    id: 'whatsapp',
+    name: 'WhatsApp',
+    status: 'available',
+    summary: 'Confirmações, lembretes e a recepção com IA, pela API oficial do WhatsApp (Meta).',
+    points: [
+      'Mensagens de confirmação e lembrete enviadas automaticamente.',
+      'Cliente responde a conversa e a assistente consulta a sua agenda.',
+      'Quando necessário, a conversa é transferida para a sua equipe.',
+    ],
+    note: 'Usa a WhatsApp Business Platform (Cloud API) da Meta, com número do AgendasPro no lançamento.',
+  },
+  {
+    id: 'asaas',
+    name: 'Asaas (Pix)',
+    status: 'available',
+    summary: 'Cobrança de sinal por Pix no momento do agendamento.',
+    points: [
+      'QR Code e Pix copia e cola gerados na hora, com prazo de validade.',
+      'Horário confirmado automaticamente após o pagamento.',
+      'Valor do sinal configurável por serviço.',
+    ],
+    note: 'O pagamento é processado pelo Asaas. Podem incidir tarifas do provedor, conforme a tabela vigente dele.',
+  },
+  {
+    id: 'google',
+    name: 'Google Agenda',
+    status: 'soon',
+    summary: 'Sincronização da agenda dos profissionais com o Google Agenda (Premium).',
+    points: ['Compromissos do AgendasPro no seu calendário.', 'Menos conflito entre agenda pessoal e profissional.'],
+    note: 'Em breve, para o plano Premium.',
+  },
+  {
+    id: 'instagram',
+    name: 'Instagram',
+    status: 'soon',
+    summary: 'Dashboard com métricas, posts, engajamento e conversão em agendamentos (Premium).',
+    points: ['Veja o que o perfil gera de agendamentos.', 'Link de agendamento com origem identificada (?src=instagram).'],
+    note: 'Em breve, para o plano Premium. Hoje você já pode usar o link da página pública na bio.',
+  },
+]
