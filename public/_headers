@@ -1,5 +1,5 @@
 # Netlify / Cloudflare Pages. Se mudar o CSP, replique em vercel.json.
-# Ajuste https://api.agendaspro.com.br para o mesmo host de VITE_API_BASE.
+# PLACEHOLDER: https://api.agendaspro.com.br em connect-src deve ser trocado pelo host real do core (o mesmo de VITE_API_BASE, ex.: https://SEU-APP.herokuapp.com). O prerender falha se VITE_API_BASE não estiver liberado aqui.
 /*
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY

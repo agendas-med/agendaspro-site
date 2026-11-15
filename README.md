@@ -26,15 +26,15 @@ npm run serve:dist             # serve dist/ com as regras de rewrite/404 do dep
 
 ### Modo mock (sem backend)
 
-Com `VITE_USE_MOCKS=true` a UI usa `src/services/mockApi.js`. Slugs de exemplo: `clinica-exemplo` (sinal por Pix) e `barbearia-exemplo` (sem sinal). O nome do cliente aciona cenários: `conflito` (409 slot_taken), `limite` (429), `erro` (500), `rede` (falha de rede), `expira` (Pix que vence em 25 s). O Pix mock é "pago" após cerca de 12 s. Em build de produção sem `VITE_USE_MOCKS=true` o mock não entra no bundle.
+Com `VITE_USE_MOCK=true` (**só em dev/teste**) a UI usa `src/services/mockApi.js`, que simula o contrato do core (ids string, `payment`, `policy`, idempotência, vencimento do Pix na leitura). Slugs: `clinica-exemplo` (sinal por Pix) e `barbearia-exemplo` (sem sinal). O nome do cliente aciona cenários: `conflito` (409 slot_taken), `limite` (429), `erro` (500), `rede`, `pagamento` (503 payment_unavailable), `indisponivel` (503 service_unavailable), `grande` (413), `expira` (Pix que vence em 25 s), `janela` (cancel_window_closed) e `linkvencido` (410 token_expired). O Pix mock é "pago" após cerca de 12 s. O mock só entra no bundle via `import()` atrás de `import.meta.env.DEV` (fora do build de produção) e o build de produção ABORTA se `VITE_USE_MOCK` ou `VITE_TURNSTILE_DEV_BYPASS` estiver `true`.
 
 ## Variáveis de ambiente
 
 Veja `.env.example` (apenas nomes e exemplos; valores reais nunca são versionados). Todas são públicas no bundle.
 
 - `VITE_APP_URL`: destino dos CTAs `/registro` e `/entrar` (painel `agendaspro-system`).
-- `VITE_API_BASE`: base da API do core (rotas `/public/*`). O mesmo host deve estar em `connect-src` do CSP.
-- `VITE_TURNSTILE_SITE_KEY`: Cloudflare Turnstile (formulário de lead e agendamento).
+- `VITE_API_BASE`: base da API do core (rotas `/public/*`), ex.: `https://SEU-APP.herokuapp.com`. O mesmo host deve estar em `connect-src` do CSP (`public/_headers` e `vercel.json`, hoje com o placeholder `https://api.agendaspro.com.br`); o prerender falha se não estiver.
+- `VITE_TURNSTILE_SITE_KEY`: Cloudflare Turnstile (lead e agendamento). Obrigatória em produção: sem ela o envio fica bloqueado com aviso visível. Em dev sem chave, `VITE_TURNSTILE_DEV_BYPASS=true` (ou mock) envia o token fixo de bypass (o core precisa estar com `TURNSTILE_ENABLED=false` e `TURNSTILE_DEV_BYPASS=true`).
 - `VITE_WHATSAPP_NUMBER`: botão de WhatsApp (`wa.me`); vazio oculta o botão.
 - `VITE_GA4_ID`, `VITE_META_PIXEL_ID`, `VITE_CLARITY_ID`: analytics, carregados só após consentimento.
 - `VITE_CHAT_ENABLED`: chat com IA (placeholder, `false` por padrão).
@@ -43,7 +43,7 @@ Veja `.env.example` (apenas nomes e exemplos; valores reais nunca são versionad
 
 Definidos em `LAUNCH-PLAN.md`: `POST /public/leads`, `GET /public/b/:slug`, `GET /public/b/:slug/availability`, `POST /public/b/:slug/bookings`. Erros no formato `{error:{code,message}}`.
 
-**Assumidos (a confirmar no core):** `GET /public/bookings/:token`, `POST /public/bookings/:token/cancel` e `POST /public/bookings/:token/reschedule`. O formato esperado está em `src/services/mockApi.js`. O Pix da página de agendamento usa o `GET` para consultar o status (polling a cada 5 s).
+Contrato completo (erros por código, token de gestão, `payment`, `policy`, idempotência, limites) em `agendaspro-core/docs/contratos-f3.md`. Gestão por token: `GET /public/bookings/:token`, `POST .../cancel`, `POST .../reschedule`. O Pix da página consulta o `GET` do token (polling leve: 5 s, 5 s, 10 s e depois 15 s; pausa com a aba oculta; recua em 429).
 
 ## Dados que o dono precisa preencher
 

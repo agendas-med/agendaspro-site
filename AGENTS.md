@@ -10,4 +10,4 @@ Scripts: `dev`, `build` (vite build + SSR + prerender), `preview`, `serve:dist`,
 - Sem `git push`/deploy sem pedido; commits com caminhos explícitos (nada de `git add .`).
 - Só anunciar recursos que estão no `LAUNCH-PLAN.md`; o que não está pronto leva "Em breve".
 - Placeholders legais (`[RAZÃO SOCIAL]`, `[CNPJ]`, ...) ficam só em `src/config/company.js`; o texto legal é modelo a revisar por advogado.
-- Endpoints `/public/bookings/:token*` são assumidos (ver `src/services/mockApi.js`) até o core publicar o contrato.
+- Contrato real do core: `agendaspro-core/docs/contratos-f3.md` (somente leitura). Mock (`VITE_USE_MOCK`) e bypass do Turnstile (`VITE_TURNSTILE_DEV_BYPASS`) existem só em dev/teste; produção nunca libera envio sem Turnstile.

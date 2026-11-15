@@ -4,6 +4,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { buildSitemap, buildRobots } from '../src/lib/sitemap.js'
+import { cspFromHeadersFile, connectSrcAllowsApi } from '../src/lib/csp.js'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const dist = path.join(root, 'dist')
@@ -66,5 +67,26 @@ if (info.hasPlaceholders) {
   )
 }
 if (info.useMocks) {
-  console.warn('\n[aviso] Build com VITE_USE_MOCKS=true: NÃO publique este build em produção.')
+  console.warn('\n[aviso] Build com mock ligado: NÃO publique este build em produção.')
+}
+if (!info.apiBase) {
+  console.warn(
+    '\n[aviso] VITE_API_BASE vazio: as chamadas /public/* vão para a mesma origem do site estático (sem API). Defina VITE_API_BASE com o host do core.',
+  )
+}
+if (!info.turnstileConfigured) {
+  console.warn(
+    '\n[aviso] VITE_TURNSTILE_SITE_KEY vazio: sem a chave do Turnstile os formulários (lead e agendamento) ficam BLOQUEADOS neste build.',
+  )
+}
+// O host da API precisa estar em connect-src do CSP, senão o navegador bloqueia 100% das chamadas.
+const headersFile = path.join(dist, '_headers')
+if (info.apiBase && fs.existsSync(headersFile)) {
+  const csp = cspFromHeadersFile(fs.readFileSync(headersFile, 'utf8'))
+  if (!connectSrcAllowsApi(csp, info.apiBase)) {
+    console.error(
+      `\n[erro] O host de VITE_API_BASE (${new URL(info.apiBase).origin}) não está em connect-src de public/_headers e vercel.json. Atualize os dois e rode o build de novo.`,
+    )
+    process.exitCode = 1
+  }
 }
