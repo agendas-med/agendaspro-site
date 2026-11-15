@@ -1,0 +1,3 @@
+# Netlify / Cloudflare Pages: páginas dinâmicas usam o shell SPA (status 200, sem redirecionar a URL).
+/b/*            /spa/index.html  200
+/agendamento/*  /spa/index.html  200

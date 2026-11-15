@@ -1,0 +1,14 @@
+{
+  "name": "AgendasPro",
+  "short_name": "AgendasPro",
+  "description": "Agenda online com lembretes por WhatsApp e sinal por Pix para negócios de serviços.",
+  "lang": "pt-BR",
+  "start_url": "/",
+  "display": "browser",
+  "background_color": "#ffffff",
+  "theme_color": "#16794a",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }
+  ]
+}
