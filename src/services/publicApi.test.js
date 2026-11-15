@@ -68,6 +68,56 @@ describe('createPublicApi (fetch real injetado)', () => {
   })
 })
 
+describe('createPublicApi (contrato real: URL e erros)', () => {
+  const mk = (res) => {
+    const fetchImpl = typeof res === 'function' ? vi.fn(res) : vi.fn().mockResolvedValue(res)
+    return { fetchImpl, api: createPublicApi({ baseUrl: 'https://api.exemplo.test', useMocks: false, fetchImpl }) }
+  }
+
+  it('availability com vários serviços usa service_id=1,2 com vírgula literal', async () => {
+    const { fetchImpl, api } = mk(jsonRes(200, { days: [] }))
+    await api.getAvailability('c', { serviceIds: [1, 2], professionalId: 5, from: '2026-01-01', to: '2026-01-07' })
+    const url = fetchImpl.mock.calls[0][0]
+    expect(url).toContain('service_id=1,2')
+    expect(url).not.toContain('%2C')
+    expect(url).toContain('professional_id=5')
+  })
+
+  it.each([
+    [410, 'token_expired'],
+    [413, 'payload_too_large'],
+    [503, 'payment_unavailable'],
+    [503, 'service_unavailable'],
+    [409, 'idempotency_conflict'],
+    [409, 'cancel_window_closed'],
+    [409, 'not_allowed'],
+    [409, 'already_cancelled'],
+  ])('%i %s vira ApiError com código, correlationId e mensagem amigável', async (status, code) => {
+    const { api } = mk(jsonRes(status, { error: { code, message: 'x', correlation_id: 'cid-1' } }))
+    const e = await api.getBooking('t').catch((x) => x)
+    expect(e).toBeInstanceOf(ApiError)
+    expect(e.status).toBe(status)
+    expect(e.code).toBe(code)
+    expect(e.correlationId).toBe('cid-1')
+    expect(friendlyError(e).length).toBeGreaterThan(10)
+  })
+
+  it('timeout (AbortError) vira ApiError timeout', async () => {
+    const abort = Object.assign(new Error('aborted'), { name: 'AbortError' })
+    const { api } = mk(() => Promise.reject(abort))
+    const e = await api.getBusiness('s').catch((x) => x)
+    expect(e).toBeInstanceOf(ApiError)
+    expect(e.code).toBe('timeout')
+  })
+
+  it('2xx com corpo que não é objeto vira invalid_response', async () => {
+    const { api } = mk(jsonRes(200, null))
+    const e = await api.getBusiness('s').catch((x) => x)
+    expect(e).toBeInstanceOf(ApiError)
+    expect(e.code).toBe('invalid_response')
+  })
+})
+
 describe('createPublicApi (mock)', () => {
   const api = createPublicApi({ useMocks: true })
   const customer = (name = 'Cliente Teste') => ({ name, phone: '+5511912345678' })
@@ -164,8 +214,128 @@ describe('createPublicApi (mock)', () => {
   })
 
   it('lead exige Turnstile e campos obrigatórios', async () => {
-    expect(await api.createLead({ name: 'Ana', whatsapp: '+5511912345678', segment: 'clinicas', turnstile_token: 't' })).toEqual({ ok: true })
-    expect((await api.createLead({ name: 'Ana', whatsapp: '+5511912345678', segment: 'clinicas' }).catch((x) => x)).code).toBe('turnstile_failed')
+    const lead = { name: 'Ana', whatsapp: '+5511912345678', segment: 'clinicas', consent: true, source: 'site' }
+    expect(await api.createLead({ ...lead, turnstile_token: 't' })).toEqual({ ok: true })
+    expect((await api.createLead(lead).catch((x) => x)).code).toBe('turnstile_failed')
+    expect((await api.createLead({ ...lead, consent: false, turnstile_token: 't' }).catch((x) => x)).code).toBe('consent_required')
+  })
+})
+
+describe('mock alinhado ao contrato do core', () => {
+  const api = createPublicApi({ useMocks: true })
+  const base = (over = {}) => ({
+    service_ids: [2],
+    professional_id: 11,
+    start: `${addDays(todayInTz('America/Sao_Paulo'), 5)}T10:00`,
+    customer: { name: 'Cliente Teste', phone: '+5511912345678' },
+    consent: true,
+    idempotency_key: newIdempotencyKey(),
+    turnstile_token: 'dev-bypass',
+    ...over,
+  })
+  const named = (name, over = {}) => base({ customer: { name, phone: '+5511912345678' }, ...over })
+  const later = (n, hh = '11:00') => `${addDays(todayInTz('America/Sao_Paulo'), n)}T${hh}`
+
+  beforeEach(() => resetMock())
+
+  it('booking.id é string opaca e há deposit_cents/payment.amount_cents', async () => {
+    const free = await api.createBooking('clinica-exemplo', base())
+    expect(typeof free.booking.id).toBe('string')
+    expect(free.booking.deposit_cents).toBe(0)
+    const paid = await api.createBooking('clinica-exemplo', base({ service_ids: [1], start: later(6, '10:00') }))
+    expect(paid.booking.deposit_cents).toBeGreaterThan(0)
+    expect(paid.payment.amount_cents).toBe(paid.booking.deposit_cents)
+    expect(paid.payment.provider).toBe('asaas')
+  })
+
+  it('mesma chave com payload diferente -> 409 idempotency_conflict', async () => {
+    const payload = base()
+    await api.createBooking('clinica-exemplo', payload)
+    const e = await api.createBooking('clinica-exemplo', { ...payload, start: later(7) }).catch((x) => x)
+    expect(e.status).toBe(409)
+    expect(e.code).toBe('idempotency_conflict')
+  })
+
+  it('GET devolve payment enquanto pending_payment; policy só remarca se confirmado', async () => {
+    const pend = await api.createBooking('clinica-exemplo', base({ service_ids: [1] }))
+    const view = await api.getBooking(pend.manage_token)
+    expect(view.booking.status).toBe('pending_payment')
+    expect(view.payment.pix_copy_paste).toBeTruthy()
+    expect(view.policy.can_cancel).toBe(true)
+    expect(view.policy.can_reschedule).toBe(false)
+    expect(view.policy.min_notice_hours).toBeGreaterThan(0)
+    const ok = await api.getBooking((await api.createBooking('clinica-exemplo', base({ start: later(6) }))).manage_token)
+    expect(ok.policy.can_reschedule).toBe(true)
+    expect(ok.payment).toBeUndefined()
+  })
+
+  it('Pix vencido é aplicado na leitura: cancelled/payment_expired e a vaga volta', async () => {
+    const created = await api.createBooking('clinica-exemplo', named('Teste expira', { service_ids: [1] }))
+    const real = Date.now()
+    const spy = vi.spyOn(Date, 'now').mockReturnValue(real + 60_000)
+    try {
+      const view = await api.getBooking(created.manage_token)
+      expect(view.booking.status).toBe('cancelled')
+      expect(view.booking.cancellation_reason).toBe('payment_expired')
+      expect(view.payment).toBeUndefined()
+    } finally {
+      spy.mockRestore()
+    }
+    const again = await api.createBooking('clinica-exemplo', base({ service_ids: [1] }))
+    expect(again.booking.status).toBe('pending_payment')
+  })
+
+  it('Pix pago é confirmado após o tempo simulado', async () => {
+    const created = await api.createBooking('clinica-exemplo', base({ service_ids: [1] }))
+    const spy = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 20_000)
+    try {
+      expect((await api.getBooking(created.manage_token)).booking.status).toBe('confirmed')
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
+  it('cancelamento registra cancellation_reason=customer', async () => {
+    const created = await api.createBooking('clinica-exemplo', base())
+    const r = await api.cancelBooking(created.manage_token)
+    expect(r.booking.cancellation_reason).toBe('customer')
+  })
+
+  it.each([
+    ['pagamento', 503, 'payment_unavailable'],
+    ['indisponivel', 503, 'service_unavailable'],
+    ['grande', 413, 'payload_too_large'],
+  ])('gatilho "%s" -> %i %s', async (name, status, code) => {
+    const e = await api.createBooking('clinica-exemplo', named(`Teste ${name}`)).catch((x) => x)
+    expect(e.status).toBe(status)
+    expect(e.code).toBe(code)
+  })
+
+  it('gatilho "janela": cancelar e remarcar dão 409 cancel_window_closed e policy fecha', async () => {
+    const created = await api.createBooking('clinica-exemplo', named('Teste janela'))
+    const view = await api.getBooking(created.manage_token)
+    expect(view.policy.can_cancel).toBe(false)
+    expect(view.policy.can_reschedule).toBe(false)
+    expect((await api.cancelBooking(created.manage_token).catch((x) => x)).code).toBe('cancel_window_closed')
+    expect((await api.rescheduleBooking(created.manage_token, later(8)).catch((x) => x)).code).toBe('cancel_window_closed')
+  })
+
+  it('gatilho "linkvencido": token devolve 410 token_expired', async () => {
+    const created = await api.createBooking('clinica-exemplo', named('Teste linkvencido'))
+    const e = await api.getBooking(created.manage_token).catch((x) => x)
+    expect(e.status).toBe(410)
+    expect(e.code).toBe('token_expired')
+  })
+
+  it('remarcar agendamento pendente de pagamento -> 409 not_allowed', async () => {
+    const created = await api.createBooking('clinica-exemplo', base({ service_ids: [1] }))
+    expect((await api.rescheduleBooking(created.manage_token, later(8)).catch((x) => x)).code).toBe('not_allowed')
+  })
+
+  it('disponibilidade aceita service_id=1,2', async () => {
+    const from = addDays(todayInTz('America/Sao_Paulo'), 1)
+    const r = await api.getAvailability('clinica-exemplo', { serviceIds: [1, 2], from, to: addDays(from, 6) })
+    expect(r.days).toHaveLength(7)
   })
 })
 
