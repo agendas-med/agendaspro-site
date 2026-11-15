@@ -13,6 +13,8 @@ export const buildInfo = () => ({
   hasPlaceholders: hasPlaceholders(),
   whatsappConfigured: whatsappIsConfigured(),
   useMocks: env.useMocks,
+  apiBase: env.apiBase,
+  turnstileConfigured: Boolean(env.turnstileSiteKey),
 })
 
 /** Renderiza uma rota para o prerender. Retorna html do app + tags de <head>. */

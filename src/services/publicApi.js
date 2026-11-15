@@ -1,16 +1,20 @@
-// Cliente da API pública do core (prefixo /public, sem autenticação). Contratos: LAUNCH-PLAN.
-// Base: VITE_API_BASE. Em VITE_USE_MOCKS=true as chamadas vão para src/services/mockApi.js.
+// Cliente da API pública do core (prefixo /public, sem autenticação). Contrato: agendaspro-core/docs/contratos-f3.md.
+// Base: VITE_API_BASE. Em dev/teste, VITE_USE_MOCK=true troca o fetch por src/services/mockApi.js.
 import { env } from '../config/env.js'
-import { ApiError } from './apiError.js'
+import { ApiError, codeFromStatus } from './apiError.js'
+import { availabilityQuery } from '../lib/bookingPayload.js'
+import { newIdempotencyKey } from '../lib/idempotency.js'
 
-export { ApiError, friendlyError } from './apiError.js'
+export { ApiError, friendlyError, isAmbiguousFailure } from './apiError.js'
+export { newIdempotencyKey }
 
 const TIMEOUT_MS = 15000
 
 const qs = (query) => {
   const p = new URLSearchParams()
   for (const [k, v] of Object.entries(query || {})) if (v !== undefined && v !== null && v !== '') p.set(k, String(v))
-  const s = p.toString()
+  // vírgula literal em listas (service_id=1,2); URLSearchParams a codificaria como %2C
+  const s = p.toString().replace(/%2C/gi, ',')
   return s ? `?${s}` : ''
 }
 
@@ -26,13 +30,12 @@ export function createPublicApi({
 } = {}) {
   async function request(method, path, { query, body } = {}) {
     if (useMocks) {
-      // Em build de produção sem VITE_USE_MOCKS=true esta condição é estática e o mock sai do bundle.
-      if (import.meta.env.PROD && import.meta.env.VITE_USE_MOCKS !== 'true') {
-        throw new ApiError(0, 'mock_disabled', 'Modo de demonstração desativado.')
-      } else {
+      // `import.meta.env.DEV` é literal estático: em build de produção o bloco e o mock saem do bundle.
+      if (import.meta.env.DEV) {
         const mock = await import('./mockApi.js')
         return mock.handle(method, path, { query: query || {}, body: body || {} })
       }
+      throw new ApiError(0, 'mock_disabled', 'Modo de demonstração desativado.')
     }
     const doFetch = fetchImpl || globalThis.fetch
     const ctrl = new AbortController()
@@ -49,7 +52,8 @@ export function createPublicApi({
         signal: ctrl.signal,
         credentials: 'omit',
       })
-    } catch {
+    } catch (e) {
+      if (e?.name === 'AbortError') throw new ApiError(0, 'timeout', 'O servidor demorou para responder.')
       throw new ApiError(0, 'network_error', 'Sem conexão com o servidor.')
     } finally {
       clearTimeout(timer)
@@ -62,30 +66,41 @@ export function createPublicApi({
       /* corpo vazio ou não-JSON */
     }
     if (!res.ok) {
+      // Retry-After só é legível cross-origin se o core o expuser (Access-Control-Expose-Headers).
       const retry = Number.parseInt(res.headers?.get?.('retry-after'), 10)
       throw new ApiError(
         res.status,
-        data?.error?.code || (res.status === 429 ? 'rate_limited' : 'http_error'),
+        data?.error?.code || codeFromStatus(res.status),
         data?.error?.message || `Erro ${res.status}`,
-        { retryAfter: Number.isFinite(retry) ? retry : undefined },
+        {
+          retryAfter: Number.isFinite(retry) ? retry : undefined,
+          correlationId: data?.error?.correlation_id,
+        },
       )
+    }
+    if (data === null || typeof data !== 'object') {
+      throw new ApiError(res.status, 'invalid_response', 'Resposta inesperada do servidor.')
     }
     return data
   }
 
   const enc = encodeURIComponent
   return {
-    /** POST /public/leads -> {ok:true} */
+    /** POST /public/leads -> 201 {ok:true} */
     createLead: (payload) => request('POST', '/leads', { body: payload }),
-    /** GET /public/b/:slug */
+    /** GET /public/b/:slug -> {company, services, professionals} */
     getBusiness: (slug) => request('GET', `/b/${enc(slug)}`),
-    /** GET /public/b/:slug/availability -> {timezone, days:[{date, slots:[{start, professional_id}]}]} */
-    getAvailability: (slug, { serviceId, professionalId, from, to }) =>
+    /**
+     * GET /public/b/:slug/availability -> {timezone, days:[{date, slots:[{start, professional_id}]}]}
+     * `serviceIds` (1 a 5) vira service_id=1,2 (duração somada); `serviceId` aceito por compatibilidade.
+     */
+    getAvailability: (slug, { serviceIds, serviceId, professionalId, from, to }) =>
       request('GET', `/b/${enc(slug)}/availability`, {
-        query: { service_id: serviceId, professional_id: professionalId, from, to },
+        query: availabilityQuery({ serviceIds: serviceIds ?? [serviceId], professionalId, from, to }),
       }),
-    /** POST /public/b/:slug/bookings -> 201 {booking, payment?, manage_token} | 409 slot_taken | 429 */
+    /** POST /public/b/:slug/bookings -> 201 (ou 200 em reenvio idempotente) {booking, payment?, manage_token} */
     createBooking: (slug, payload) => request('POST', `/b/${enc(slug)}/bookings`, { body: payload }),
+    /** GET /public/bookings/:token -> {booking, company, policy, payment?} (410 token_expired) */
     getBooking: (token) => request('GET', `/bookings/${enc(token)}`),
     cancelBooking: (token) => request('POST', `/bookings/${enc(token)}/cancel`, { body: {} }),
     rescheduleBooking: (token, start) => request('POST', `/bookings/${enc(token)}/reschedule`, { body: { start } }),
@@ -93,9 +108,3 @@ export function createPublicApi({
 }
 
 export const publicApi = createPublicApi()
-
-/** UUID v4 para idempotency_key. */
-export function newIdempotencyKey() {
-  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID()
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`
-}
