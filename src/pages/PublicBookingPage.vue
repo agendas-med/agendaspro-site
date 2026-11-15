@@ -64,7 +64,8 @@ useHead({
   title: pageTitle,
   meta: [
     { name: 'description', content: pageDesc },
-    { name: 'robots', content: 'index, follow' },
+    // 404/erro de carregamento também chegam com status 200 pelo shell SPA: não indexar.
+    { name: 'robots', content: computed(() => (loadState.value === 'ready' ? 'index, follow' : 'noindex, nofollow')) },
     { property: 'og:type', content: 'website' },
     { property: 'og:title', content: pageTitle },
     { property: 'og:description', content: pageDesc },
@@ -255,6 +256,19 @@ async function submit() {
     submitting.value = false
     turnstile.value?.reset()
   }
+}
+
+// Pix vencido: o horário foi liberado; recomeça da escolha de horário com slot e idempotency_key novos
+// (reusar a chave devolveria a reserva expirada).
+async function pickAnotherTime() {
+  pixExpired.value = false
+  confirmedTracked.value = false
+  result.value = null
+  sel.slot = null
+  idemKey.value = newIdempotencyKey()
+  submitError.value = ''
+  await go(3)
+  await loadAvailability(true)
 }
 
 function onPixConfirmed(booking) {
@@ -536,7 +550,7 @@ onBeforeUnmount(() => clearInterval(cooldownTimer))
             </div>
             <p class="sr-only" role="status" aria-live="polite">{{ linkCopied ? 'Link copiado' : '' }}</p>
           </div>
-          <button v-else type="button" class="bk-primary mt-5" @click="((pixExpired = false), (result = null), go(3), loadAvailability(true))">Escolher outro horário</button>
+          <button v-else type="button" class="bk-primary mt-5" @click="pickAnotherTime">Escolher outro horário</button>
         </section>
 
         <footer v-if="company.powered_by" class="mt-10 text-center text-xs text-[var(--color-ink-soft)]">
