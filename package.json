@@ -4,10 +4,11 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": "24.x"
   },
   "scripts": {
     "dev": "vite --host",
+    "lint": "eslint .",
     "build": "vite build && vite build --ssr src/entry-server.js --outDir dist-ssr && node scripts/prerender.mjs",
     "preview": "vite preview",
     "serve:dist": "node scripts/serve-dist.mjs",
@@ -21,8 +22,12 @@
     "vue-router": "^4.5.1"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
     "@tailwindcss/vite": "^4.1.8",
     "@vitejs/plugin-vue": "^5.2.3",
+    "eslint": "^9.39.5",
+    "eslint-plugin-vue": "^10.12.1",
+    "globals": "^16.5.0",
     "tailwindcss": "^4.1.8",
     "vite": "^6.2.4",
     "vitest": "^3.2.0"

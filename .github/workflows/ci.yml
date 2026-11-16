@@ -1,0 +1,56 @@
+# CI do site: lint, testes e build de produção (SSG + prerender) com flags de produção.
+# Sem deploy: o deploy é feito pelo provedor (Cloudflare Pages/Netlify/Vercel) a partir do repositório.
+name: CI
+
+on:
+  push:
+    branches: [main, 'launch/**']
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Testes
+        run: npm test
+
+      - name: Build de produção
+        env:
+          NODE_ENV: production
+          # Valores públicos de exemplo; o host da API precisa estar no connect-src do CSP.
+          VITE_SITE_URL: https://agendaspro.com.br
+          VITE_APP_URL: https://app.agendaspro.com.br
+          VITE_API_BASE: https://api.agendaspro.com.br
+          VITE_USE_MOCK: 'false'
+          VITE_TURNSTILE_DEV_BYPASS: 'false'
+          VITE_CHAT_ENABLED: 'false'
+        run: npm run build
+
+      - name: Artefato sem flags de desenvolvimento
+        run: |
+          test -f dist/index.html
+          test -f dist/_headers
+          # O objeto de env embutido no bundle deve ter as flags de dev como "false".
+          if grep -R -l -E '(VITE_USE_MOCKS?|VITE_TURNSTILE_DEV_BYPASS):"true"' dist; then
+            echo "flag de desenvolvimento no build" >&2; exit 1
+          fi

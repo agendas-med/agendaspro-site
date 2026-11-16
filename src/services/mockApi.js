@@ -204,6 +204,7 @@ function checkTriggers(name) {
 
 /** Impressão digital do payload (sem idempotency_key/turnstile_token): mesma chave + dados diferentes = conflito. */
 function fingerprint(body) {
+  // eslint-disable-next-line no-unused-vars
   const { idempotency_key, turnstile_token, ...rest } = body || {}
   return JSON.stringify(rest, (k, v) => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).sort()) : v))
 }

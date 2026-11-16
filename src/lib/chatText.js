@@ -6,7 +6,7 @@ const MAX_TEXT = 4000
 const MAX_URL = 2048
 // caracteres de controle (menos \n e \t) e de direção bidi, que permitem "esconder" texto
 // eslint-disable-next-line no-control-regex
-const CONTROL_RE = /[\u0000-\u0008\u000B-\u001F\u007F​-‏‪-‮⁦-⁩﻿]/g
+const CONTROL_RE = /[\u0000-\u0008\u000B-\u001F\u007F\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g
 
 /** Remove controles/bidi e limita o tamanho. */
 export function cleanText(text) {
@@ -30,6 +30,7 @@ const hostMatches = (host, allowed) => allowed.some((a) => host === a || host.en
  */
 export function safeHref(url, { allowedHosts = [], allowRelative = true, allowLocalHttp = false } = {}) {
   const raw = String(url ?? '').trim()
+  // eslint-disable-next-line no-control-regex -- rejeita de propósito caracteres de controle
   if (!raw || raw.length > MAX_URL || /[\s\u0000-\u001F\u007F\\]/.test(raw)) return null
   if (/^mailto:/i.test(raw)) {
     return /^mailto:[^\s@?&#]+@[^\s@?&#]+\.[^\s@?&#]+$/i.test(raw) ? raw : null

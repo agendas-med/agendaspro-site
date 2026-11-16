@@ -8,7 +8,7 @@ export function captureAttribution() {
   try {
     const q = new URLSearchParams(window.location.search)
     const fromUrl = ['utm_source', 'utm_medium', 'utm_campaign']
-      .map((k) => (q.get(k) || '').slice(0, 40).replace(/[^\w.\-]/g, ''))
+      .map((k) => (q.get(k) || '').slice(0, 40).replace(/[^\w.-]/g, ''))
       .filter(Boolean)
     if (fromUrl.length) window.sessionStorage.setItem(KEY, fromUrl.join('/'))
     label.value = window.sessionStorage.getItem(KEY) || ''
