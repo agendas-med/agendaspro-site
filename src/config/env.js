@@ -20,7 +20,13 @@ export const env = {
   turnstileSiteKey: e.VITE_TURNSTILE_SITE_KEY || '',
   /** VITE_TURNSTILE_DEV_BYPASS=true (só dev/teste, sem site key): envia o token fixo de bypass. */
   turnstileDevBypass: bool(e.VITE_TURNSTILE_DEV_BYPASS) && !e.PROD,
+  /** VITE_CHAT_ENABLED=true liga o widget de chat (o core também precisa de PUBLIC_CHAT_ENABLED=true). */
   chatEnabled: bool(e.VITE_CHAT_ENABLED),
+  /** Domínios extras permitidos como link nas respostas do chat (CSV). Já valem: site, app, wa.me, instagram.com. */
+  chatLinkHosts: String(e.VITE_CHAT_LINK_HOSTS || '')
+    .split(',')
+    .map((h) => h.trim().toLowerCase())
+    .filter((h) => /^[a-z0-9.-]+$/.test(h)),
   whatsappNumber: String(e.VITE_WHATSAPP_NUMBER || '').replace(/\D/g, ''),
   /** Slug de uma página pública de exemplo (link "ver exemplo"). Em mock, usa a fixture. */
   demoSlug: e.VITE_DEMO_SLUG || (wantsMock ? 'clinica-exemplo' : ''),
