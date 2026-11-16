@@ -72,6 +72,17 @@ Contrato completo (erros por código, token de gestão, `payment`, `policy`, ide
 - A imagem de compartilhamento é `public/og-image.png` (1200x630).
 - Analytics: nenhum script de terceiros carrega antes do consentimento (`localStorage` `ap_consent_v1`). Eventos: `generate_lead`, `sign_up_click`, `whatsapp_click`, `booking_confirmed`.
 
+### Deploy em produção
+
+Site estático (`dist/`), sem servidor. O provedor builda a partir do repositório; não há deploy pelo CI.
+
+- **Provedor**: Cloudflare Pages (recomendado, plano gratuito permite uso comercial) ou Netlify. Vercel Hobby proíbe uso comercial; use só no plano Pro. Build: `npm run build`, saída `dist`, Node 24 (`engines`, `netlify.toml`; no Cloudflare Pages defina `NODE_VERSION=24`).
+- **Variáveis no provedor** (escopo produção): `VITE_SITE_URL`, `VITE_APP_URL`, `VITE_API_BASE` (host do core), `VITE_TURNSTILE_SITE_KEY`, `VITE_CHAT_ENABLED`, `VITE_WHATSAPP_NUMBER` e analytics opcionais. Nunca defina `VITE_USE_MOCK` nem `VITE_TURNSTILE_DEV_BYPASS` como `true`: o build aborta. São valores públicos (vão no bundle); nada de segredo aqui.
+- **CSP**: antes do primeiro deploy, troque `https://api.agendaspro.com.br` em `public/_headers` e `vercel.json` pelo host real de `VITE_API_BASE` (os dois arquivos precisam ficar idênticos; há teste para isso e o prerender falha se o host não estiver em `connect-src`).
+- **Domínio**: aponte o domínio (ex.: `agendaspro.com.br`) no provedor com HTTPS; `VITE_SITE_URL` deve ser exatamente essa origem (canonical, sitemap, OG). No core, inclua a origem do site em `PUBLIC_CORS_ORIGINS` (rotas `/public/*`) e use-a em `PUBLIC_SITE_URL`.
+- **Checagem pós-deploy**: abrir `/`, `/precos` e uma `/b/<slug>` real; conferir no DevTools que não há erro de CSP e que `POST /public/leads` chega ao core.
+- **CI** (`.github/workflows/ci.yml`): lint, testes e build de produção com flags falsas; falha se o bundle tiver `VITE_USE_MOCK`/`VITE_TURNSTILE_DEV_BYPASS` como `"true"`.
+
 ## Estrutura
 
 ```
