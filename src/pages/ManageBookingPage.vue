@@ -249,14 +249,19 @@ onBeforeUnmount(() => clearInterval(cooldownTimer))
 
 <template>
   <div class="min-h-screen bg-slate-50">
-    <div v-if="state === 'loading'" class="mx-auto max-w-xl p-6" role="status" aria-live="polite">
-      <div class="h-24 animate-pulse rounded-2xl bg-slate-200" />
-      <div class="mt-4 h-40 animate-pulse rounded-2xl bg-slate-200" />
+    <div v-if="state === 'loading'" class="mx-auto max-w-xl px-4 pb-12 pt-6" role="status" aria-live="polite">
+      <div class="h-4 w-32 animate-pulse rounded bg-slate-200" />
+      <div class="mt-2 h-8 w-56 animate-pulse rounded bg-slate-200" />
+      <div class="mt-4 h-44 animate-pulse rounded-2xl bg-slate-200" />
+      <div class="mt-5 h-12 animate-pulse rounded-xl bg-slate-200" />
       <span class="sr-only">Carregando agendamento...</span>
     </div>
 
-    <main v-else-if="state !== 'ready'" id="conteudo" class="mx-auto max-w-xl p-6 text-center">
-      <h1 class="text-2xl">
+    <main v-else-if="state !== 'ready'" id="conteudo" class="mx-auto max-w-xl px-4 py-10 text-center sm:py-16">
+      <span class="mx-auto grid h-14 w-14 place-items-center rounded-full" :class="state === 'error' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'">
+        <AppIcon :name="state === 'error' ? 'alert' : 'clock'" :size="28" />
+      </span>
+      <h1 class="mt-4 text-2xl">
         {{ state === 'notfound' ? 'Agendamento não encontrado' : state === 'expired' ? 'Este link expirou' : 'Não foi possível carregar' }}
       </h1>
       <p class="mt-3 text-[var(--color-ink-soft)]">
@@ -268,8 +273,8 @@ onBeforeUnmount(() => clearInterval(cooldownTimer))
               : loadError
         }}
       </p>
-      <button v-if="state === 'error'" type="button" class="btn btn-primary mt-6" @click="load">Tentar de novo</button>
-      <RouterLink v-else to="/" class="btn btn-outline mt-6">Ir para o início</RouterLink>
+      <button v-if="state === 'error'" type="button" class="btn btn-primary mt-6 w-full sm:w-auto" @click="load">Tentar de novo</button>
+      <RouterLink v-else to="/" class="btn btn-outline mt-6 w-full sm:w-auto">Ir para o início</RouterLink>
     </main>
 
     <main v-else id="conteudo" class="mx-auto max-w-xl px-4 pb-12 pt-6">
@@ -278,20 +283,22 @@ onBeforeUnmount(() => clearInterval(cooldownTimer))
         {{ mode === 'reschedule' ? 'Remarcar agendamento' : mode === 'confirm-cancel' ? 'Cancelar agendamento?' : 'Meu agendamento' }}
       </h1>
 
-      <p v-if="notice" class="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900" role="status">{{ notice }}</p>
+      <p v-if="notice" class="mt-4 flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900" role="status">
+        <AppIcon name="check" :size="18" class="mt-0.5 shrink-0" /> <span>{{ notice }}</span>
+      </p>
 
-      <section class="mt-4 rounded-2xl border border-[var(--color-line)] bg-white p-4" aria-label="Detalhes do agendamento">
+      <section class="mt-4 rounded-2xl border border-[var(--color-line)] bg-white p-4 shadow-card sm:p-5" aria-label="Detalhes do agendamento">
         <span class="inline-block rounded-full px-3 py-1 text-xs font-semibold" :class="statusClass">{{ statusLabel }}</span>
-        <p class="mt-3 font-semibold">{{ (booking.service_names || []).join(', ') }}</p>
-        <p class="text-[var(--color-ink-soft)]">{{ formatLocalDateTime(booking.start) }}</p>
-        <p v-if="booking.professional_name" class="text-[var(--color-ink-soft)]">com {{ booking.professional_name }}</p>
-        <p v-if="cancelReasonText" class="mt-2 text-sm text-[var(--color-ink-soft)]">{{ cancelReasonText }}</p>
-        <p v-if="company.address" class="mt-2 flex items-start gap-2 text-sm text-[var(--color-ink-soft)]">
-          <AppIcon name="pin" :size="16" class="mt-0.5 shrink-0" /> {{ company.address }}
+        <p class="mt-3 break-words text-lg font-semibold leading-snug">{{ (booking.service_names || []).join(', ') }}</p>
+        <p class="mt-2 flex items-start gap-2 text-[var(--color-ink-soft)]"><AppIcon name="calendar" :size="18" class="mt-0.5 shrink-0" /> {{ formatLocalDateTime(booking.start) }}</p>
+        <p v-if="booking.professional_name" class="mt-1 flex items-start gap-2 text-[var(--color-ink-soft)]"><AppIcon name="user" :size="18" class="mt-0.5 shrink-0" /> com {{ booking.professional_name }}</p>
+        <p v-if="company.address" class="mt-1 flex items-start gap-2 text-[var(--color-ink-soft)]">
+          <AppIcon name="pin" :size="18" class="mt-0.5 shrink-0" /> <span class="min-w-0 break-words">{{ company.address }}</span>
         </p>
-        <p v-if="company.phone" class="mt-1 flex items-start gap-2 text-sm text-[var(--color-ink-soft)]">
-          <AppIcon name="phone" :size="16" class="mt-0.5 shrink-0" /> {{ company.phone }}
+        <p v-if="company.phone" class="mt-1 flex items-start gap-2 text-[var(--color-ink-soft)]">
+          <AppIcon name="phone" :size="18" class="mt-0.5 shrink-0" /> {{ company.phone }}
         </p>
+        <p v-if="cancelReasonText" class="mt-3 rounded-lg bg-slate-100 p-2.5 text-sm text-[var(--color-ink-soft)]">{{ cancelReasonText }}</p>
       </section>
 
       <p v-if="actionError" class="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800" role="alert">
@@ -335,7 +342,7 @@ onBeforeUnmount(() => clearInterval(cooldownTimer))
       </section>
 
       <!-- confirmar cancelamento -->
-      <section v-else-if="mode === 'confirm-cancel'" class="mt-5" aria-live="polite">
+      <section v-else-if="mode === 'confirm-cancel'" class="mt-5 rounded-2xl border border-red-200 bg-red-50/60 p-4" aria-live="polite">
         <p class="text-sm">Tem certeza? O horário será liberado e esta ação não pode ser desfeita por aqui.</p>
         <p v-if="status === 'pending_payment'" class="mt-2 text-sm text-[var(--color-ink-soft)]">Como o sinal ainda não foi pago, nenhuma cobrança será feita.</p>
         <div class="mt-4 flex flex-col gap-3 sm:flex-row">
@@ -348,6 +355,7 @@ onBeforeUnmount(() => clearInterval(cooldownTimer))
 
       <!-- remarcar -->
       <section v-else class="mt-5">
+        <p class="mb-4 text-sm text-[var(--color-ink-soft)]">Escolha o novo dia e horário para este agendamento.</p>
         <div v-if="availState === 'loading' && !days.length" class="space-y-3" role="status" aria-live="polite">
           <div class="h-16 animate-pulse rounded-xl bg-slate-200" />
           <div class="h-32 animate-pulse rounded-xl bg-slate-200" />
@@ -361,12 +369,12 @@ onBeforeUnmount(() => clearInterval(cooldownTimer))
           Não há horários livres nos próximos dias.<template v-if="company.phone"> Fale com o estabelecimento: {{ company.phone }}.</template>
         </div>
         <template v-else>
-          <div class="-mx-4 overflow-x-auto px-4" role="group" aria-label="Dias disponíveis">
+          <div class="mg-days -mx-4 overflow-x-auto px-4" role="group" aria-label="Dias disponíveis">
             <ul class="flex gap-2 pb-2">
-              <li v-for="d in days" :key="d.date">
+              <li v-for="d in days" :key="d.date" class="snap-start">
                 <button
                   type="button"
-                  class="min-w-[4.25rem] rounded-xl border-[1.5px] px-1 py-2 text-center"
+                  class="min-h-[4.5rem] min-w-[4.25rem] rounded-xl border-[1.5px] px-1 py-2 text-center"
                   :class="selDate === d.date ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-300 bg-white'"
                   :aria-pressed="selDate === d.date"
                   :aria-label="formatDateLong(d.date)"
@@ -379,16 +387,16 @@ onBeforeUnmount(() => clearInterval(cooldownTimer))
               </li>
             </ul>
           </div>
-          <button v-if="windowsLoaded < 6" type="button" class="mt-1 text-sm font-semibold underline" :disabled="availState === 'loading'" @click="loadAvailability(false)">
+          <button v-if="windowsLoaded < 6" type="button" class="mt-1 inline-flex min-h-11 items-center text-sm font-semibold underline underline-offset-2" :disabled="availState === 'loading'" @click="loadAvailability(false)">
             {{ availState === 'loading' ? 'Buscando...' : 'Ver mais datas' }}
           </button>
 
           <h2 class="mb-2 mt-5 text-base">Horários em {{ formatDateLong(selDate) }}</h2>
-          <ul class="grid grid-cols-3 gap-2" role="group" aria-label="Horários disponíveis">
+          <ul class="grid grid-cols-3 gap-2 sm:grid-cols-4" role="group" aria-label="Horários disponíveis">
             <li v-for="s in daySlots" :key="s.start">
               <button
                 type="button"
-                class="w-full rounded-xl border-[1.5px] py-2.5 font-semibold"
+                class="min-h-11 w-full rounded-xl border-[1.5px] py-2.5 font-semibold"
                 :class="selTime === s.start ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-300 bg-white'"
                 :aria-pressed="selTime === s.start"
                 @click="selTime = s.start"
@@ -399,7 +407,7 @@ onBeforeUnmount(() => clearInterval(cooldownTimer))
           </ul>
         </template>
 
-        <div class="mt-6 flex items-center gap-3">
+        <div class="sticky bottom-0 z-10 -mx-4 mt-6 flex items-center gap-3 border-t border-[var(--color-line)] bg-white/95 px-4 pt-3 backdrop-blur" style="padding-bottom: max(0.75rem, env(safe-area-inset-bottom))">
           <button type="button" class="btn btn-outline" :disabled="busy" @click="back">Voltar</button>
           <button type="button" class="btn btn-primary flex-1" :disabled="busy || !selTime || cooldown > 0" :aria-busy="busy" @click="reschedule">
             {{ busy ? 'Remarcando...' : 'Confirmar novo horário' }}
@@ -409,3 +417,14 @@ onBeforeUnmount(() => clearInterval(cooldownTimer))
     </main>
   </div>
 </template>
+
+<style scoped>
+.mg-days {
+  scroll-snap-type: x proximity;
+  scroll-padding-inline: 1rem;
+  scrollbar-width: none;
+}
+.mg-days::-webkit-scrollbar {
+  display: none;
+}
+</style>
