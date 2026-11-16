@@ -356,11 +356,12 @@ function onKeydown(e) {
     </div>
 
     <div class="border-t border-line bg-white">
-      <div class="min-h-5 px-3 pt-2 text-xs" aria-live="polite">
-        <p v-if="s.notice" :class="s.notice.kind === 'error' ? 'text-red-700' : 'text-[var(--color-ink-soft)]'">
-          {{ s.notice.text }}<template v-if="waiting"> Tente de novo em {{ formatWait(s.retryIn) }}.</template>
-        </p>
-        <p v-else-if="waiting" class="text-[var(--color-ink-soft)]">Tente de novo em {{ formatWait(s.retryIn) }}.</p>
+      <!-- A contagem muda a cada segundo: fica fora da região viva (aria-hidden) para o leitor de tela não repetir. -->
+      <div class="min-h-5 px-3 pt-2 text-xs">
+        <div aria-live="polite">
+          <p v-if="s.notice" :class="s.notice.kind === 'error' ? 'text-red-700' : 'text-[var(--color-ink-soft)]'">{{ s.notice.text }}</p>
+        </div>
+        <p v-if="waiting" aria-hidden="true" class="text-[var(--color-ink-soft)]">Tente de novo em {{ formatWait(s.retryIn) }}.</p>
       </div>
       <form v-if="s.phase === 'chat' && !limitReached" class="flex items-end gap-2 px-3 pb-2" @submit.prevent="submitMessage">
         <label for="chat-input" class="sr-only">Sua mensagem</label>

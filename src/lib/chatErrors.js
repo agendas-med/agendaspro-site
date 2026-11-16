@@ -1,6 +1,5 @@
 // Classifica os erros do contrato do chat (contratos-f5a.md) em tipos tratáveis pela UI, com texto pt-BR.
 import { ApiError } from '../services/apiError.js'
-import { formatWait } from './chatFormat.js'
 
 const DEFAULT_WAIT = { rate_limited: 30, too_fast: 2, cooldown: 60, in_progress: 2 }
 
@@ -34,7 +33,7 @@ export function chatErrorInfo(e) {
   }
   if (code === 'cooldown') {
     const w = wait('cooldown')
-    return { kind: 'cooldown', text: `Vamos fazer uma pausa. Você poderá escrever de novo em ${formatWait(w)}.`, retryable: true, wait: w }
+    return { kind: 'cooldown', text: 'Vamos fazer uma pausa antes da próxima mensagem.', retryable: true, wait: w }
   }
   if (code === 'too_fast') {
     const w = wait('too_fast')
@@ -42,7 +41,7 @@ export function chatErrorInfo(e) {
   }
   if (code === 'rate_limited' || e.status === 429) {
     const w = wait('rate_limited')
-    return { kind: 'rate_limited', text: `Muitas mensagens em pouco tempo. Tente de novo em ${formatWait(w)}.`, retryable: true, wait: w }
+    return { kind: 'rate_limited', text: 'Muitas mensagens em pouco tempo.', retryable: true, wait: w }
   }
   if (code === 'in_progress') return { kind: 'in_progress', text: 'Sua mensagem ainda está sendo respondida.', retryable: true, wait: wait('in_progress') }
   if (code === 'message_too_long' || code === 'payload_too_large' || e.status === 413) {
