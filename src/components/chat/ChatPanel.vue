@@ -266,13 +266,15 @@ function onKeydown(e) {
             <button
               type="button"
               data-autofocus
-              class="w-full rounded-xl border border-line p-3 text-left text-sm font-medium hover:border-brand-600 hover:bg-brand-50"
+              class="flex min-h-14 w-full items-center justify-between gap-3 rounded-xl border border-line p-3 text-left text-sm font-medium hover:border-brand-600 hover:bg-brand-50"
               @click="pick('customer')"
             >
-              Quero agendar ou tirar dúvidas como cliente
+              <span>Quero agendar ou tirar dúvidas como cliente</span>
+              <span aria-hidden="true" class="text-brand-600">→</span>
             </button>
-            <button type="button" class="w-full rounded-xl border border-line p-3 text-left text-sm font-medium hover:border-brand-600 hover:bg-brand-50" @click="pick('business')">
-              Tenho um negócio e quero conhecer o AgendasPro
+            <button type="button" class="flex min-h-14 w-full items-center justify-between gap-3 rounded-xl border border-line p-3 text-left text-sm font-medium hover:border-brand-600 hover:bg-brand-50" @click="pick('business')">
+              <span>Tenho um negócio e quero conhecer o AgendasPro</span>
+              <span aria-hidden="true" class="text-brand-600">→</span>
             </button>
           </div>
           <p class="mt-3 text-xs text-[var(--color-ink-soft)]">
@@ -294,7 +296,7 @@ function onKeydown(e) {
             {{ s.startError ? 'Tentar de novo' : 'Voltar' }}
           </button>
         </div>
-        <button v-if="!s.starting" type="button" class="text-xs underline" @click="controller.backToGate()">Trocar a minha escolha</button>
+        <button v-if="!s.starting" type="button" class="inline-flex min-h-11 items-center text-xs underline" @click="controller.backToGate()">Trocar a minha escolha</button>
       </div>
 
       <!-- 3) conversa / encerrada -->
@@ -388,7 +390,7 @@ function onKeydown(e) {
       </p>
       <p class="px-3 pb-3 text-[11px] leading-snug text-[var(--color-ink-soft)]">
         Assistente de IA — pode errar; não substitui atendimento humano.
-        <a href="/privacidade" target="_blank" rel="noopener noreferrer" class="underline">Política de privacidade</a>
+        <a href="/privacidade" target="_blank" rel="noopener noreferrer" class="inline-block py-1.5 underline">Política de privacidade</a>
       </p>
     </div>
   </section>

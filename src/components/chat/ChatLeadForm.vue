@@ -94,12 +94,12 @@ function submit() {
     </div>
 
     <div>
-      <label class="flex items-start gap-2 text-xs">
+      <label class="flex items-start gap-3 rounded-lg bg-slate-50 p-2.5 text-xs leading-relaxed">
         <input
           id="chat-lead-consent"
           v-model="form.consent"
           type="checkbox"
-          class="mt-0.5 h-4 w-4 shrink-0 accent-[var(--color-brand-600)]"
+          class="mt-0.5 h-5 w-5 shrink-0 accent-[var(--color-brand-600)]"
           :aria-invalid="Boolean(errors.consent)"
           :aria-describedby="errors.consent ? 'chat-lead-consent-err' : undefined"
         />
@@ -113,7 +113,7 @@ function submit() {
 
     <p v-if="error" class="field-error" role="alert">{{ error }}</p>
 
-    <div class="flex gap-2">
+    <div class="sticky bottom-0 -mx-3 -mb-3 flex gap-2 rounded-b-xl border-t border-line bg-white p-3">
       <button type="submit" class="btn btn-primary flex-1" :disabled="busy" :aria-busy="busy">{{ busy ? 'Enviando…' : 'Enviar contato' }}</button>
       <button type="button" class="btn btn-outline" :disabled="busy" @click="emit('cancel')">Cancelar</button>
     </div>

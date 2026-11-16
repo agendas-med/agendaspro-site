@@ -118,7 +118,7 @@ const showSuggestions = computed(() => props.isLast && !props.busy && !isUser.va
       <li v-for="s in message.suggestions" :key="s">
         <button
           type="button"
-          class="rounded-full border border-brand-600 bg-white px-3 py-1 text-xs font-medium text-brand-700 hover:bg-brand-50"
+          class="inline-flex min-h-11 items-center rounded-full border border-brand-600 bg-white px-3.5 py-1 text-[13px] font-medium text-brand-700 hover:bg-brand-50 sm:min-h-9 sm:text-xs"
           @click="emit('suggest', s)"
         >
           {{ s }}
@@ -128,11 +128,11 @@ const showSuggestions = computed(() => props.isLast && !props.busy && !isUser.va
 
     <div v-if="message.status === 'failed'" class="mt-1 flex max-w-[88%] flex-col items-end gap-1 text-xs" role="alert">
       <p class="text-red-700">{{ message.error || 'Não foi possível enviar.' }}</p>
-      <div class="flex gap-3">
-        <button type="button" class="font-semibold text-brand-700 underline disabled:opacity-50" :disabled="retryBlocked" @click="emit('retry', message.id)">
+      <div class="flex gap-1">
+        <button type="button" class="inline-flex min-h-11 items-center px-2 font-semibold text-brand-700 underline disabled:opacity-50" :disabled="retryBlocked" @click="emit('retry', message.id)">
           Tentar de novo
         </button>
-        <button type="button" class="underline" @click="emit('discard', message.id)">Descartar</button>
+        <button type="button" class="inline-flex min-h-11 items-center px-2 underline" @click="emit('discard', message.id)">Descartar</button>
       </div>
     </div>
     <p v-else-if="message.status === 'sending'" class="mt-0.5 text-[11px] text-[var(--color-ink-soft)]">Enviando…</p>
