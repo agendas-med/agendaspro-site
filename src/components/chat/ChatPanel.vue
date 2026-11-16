@@ -224,7 +224,7 @@ function onKeydown(e) {
     aria-modal="false"
     aria-labelledby="chat-title"
     tabindex="-1"
-    class="flex h-[min(34rem,calc(100dvh-6.5rem))] w-[calc(100vw-1.5rem)] max-w-sm flex-col overflow-hidden rounded-2xl border border-line bg-white shadow-pop outline-none"
+    class="flex h-[min(34rem,calc(var(--ap-vvh,100dvh)-1.5rem-env(safe-area-inset-bottom,0px)))] w-[calc(100vw-1.5rem)] max-w-sm sm:h-[min(34rem,calc(100dvh-6.5rem))] flex-col overflow-hidden rounded-2xl border border-line bg-white shadow-pop outline-none"
     @keydown="onKeydown"
   >
     <header class="flex items-start justify-between gap-2 bg-brand-600 px-4 py-3 text-white">
@@ -236,12 +236,12 @@ function onKeydown(e) {
         <button
           v-if="s.phase === 'chat' && hasUserMessage && !confirmClose"
           type="button"
-          class="rounded px-2 py-1 text-xs font-medium hover:bg-white/15"
+          class="min-h-11 rounded px-3 text-xs font-medium hover:bg-white/15"
           @click="confirmClose = true"
         >
           Encerrar
         </button>
-        <button type="button" class="rounded p-1 hover:bg-white/15" aria-label="Fechar chat" @click="emit('close')">
+        <button type="button" class="grid h-11 w-11 place-items-center rounded hover:bg-white/15" aria-label="Fechar chat" @click="emit('close')">
           <AppIcon name="x" :size="20" />
         </button>
       </div>

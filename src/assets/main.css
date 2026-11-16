@@ -265,6 +265,36 @@
   }
 }
 
+/* Posição do botão/painel do chat: respeita a safe-area, sobe acima da barra fixa de /b/:slug (celular/tablet)
+   e acima do teclado virtual (--ap-kb, medido no ChatWidget). */
+.chat-dock {
+  right: 0.75rem;
+  bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px) + var(--ap-kb, 0px) + var(--ap-lift, 0px));
+}
+@media (max-width: 1023px) {
+  html.has-sticky-bar .chat-dock {
+    --ap-lift: 4.75rem;
+  }
+}
+.chat-dock.is-open,
+.chat-dock.kb-open {
+  --ap-lift: 0px;
+}
+@media (max-width: 639px) {
+  .chat-dock.consent-open:not(.is-open) {
+    bottom: 12rem;
+  }
+  /* painel aberto no celular fica acima do aviso de cookies (que é fixo na base) */
+  .chat-dock.is-open {
+    z-index: 55;
+  }
+}
+@media (min-width: 640px) {
+  .chat-dock {
+    right: 1rem;
+  }
+}
+
 .sr-only-focusable:not(:focus):not(:focus-within) {
   position: absolute;
   width: 1px;
