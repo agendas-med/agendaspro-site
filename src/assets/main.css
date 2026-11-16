@@ -263,6 +263,21 @@
   .prose-legal th {
     background: #f8fafc;
   }
+  /* Tabelas largas no celular: rolagem horizontal com sombra nas bordas indicando que há mais colunas. */
+  .table-scroll {
+    overflow-x: auto;
+    margin-bottom: 1.2rem;
+    border-radius: 0.5rem;
+    background:
+      linear-gradient(to right, #fff 30%, rgb(255 255 255 / 0)) left center / 2rem 100% no-repeat local,
+      linear-gradient(to left, #fff 30%, rgb(255 255 255 / 0)) right center / 2rem 100% no-repeat local,
+      linear-gradient(to right, rgb(16 36 58 / 0.14), rgb(16 36 58 / 0)) left center / 0.75rem 100% no-repeat scroll,
+      linear-gradient(to left, rgb(16 36 58 / 0.14), rgb(16 36 58 / 0)) right center / 0.75rem 100% no-repeat scroll;
+  }
+  .table-scroll table {
+    min-width: 34rem;
+    margin-bottom: 0;
+  }
 }
 
 /* Posição do botão/painel do chat: respeita a safe-area, sobe acima da barra fixa de /b/:slug (celular/tablet)

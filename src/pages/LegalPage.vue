@@ -30,7 +30,7 @@ useSeo({
           <ul v-else-if="b.ul">
             <li v-for="(li, j) in b.ul" :key="j">{{ li }}</li>
           </ul>
-          <div v-else-if="b.table" class="relative overflow-x-auto">
+          <div v-else-if="b.table" class="table-scroll" tabindex="0" role="region" aria-label="Tabela (role para o lado para ver todas as colunas)">
             <table>
               <thead>
                 <tr><th v-for="h in b.table.head" :key="h" scope="col">{{ h }}</th></tr>

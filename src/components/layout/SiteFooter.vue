@@ -24,31 +24,31 @@ const year = new Date().getFullYear()
 
       <nav aria-labelledby="f-produto">
         <h2 id="f-produto" class="mb-3 text-sm font-semibold text-white">Produto</h2>
-        <ul class="space-y-2 text-sm">
-          <li><RouterLink class="hover:text-white" to="/recursos">Recursos</RouterLink></li>
-          <li><RouterLink class="hover:text-white" to="/integracoes">Integrações</RouterLink></li>
-          <li><RouterLink class="hover:text-white" to="/precos">Preços</RouterLink></li>
-          <li><RouterLink class="hover:text-white" to="/contato">Contato</RouterLink></li>
+        <ul class="text-sm md:space-y-2">
+          <li><RouterLink class="inline-flex min-h-11 items-center hover:text-white md:min-h-0" to="/recursos">Recursos</RouterLink></li>
+          <li><RouterLink class="inline-flex min-h-11 items-center hover:text-white md:min-h-0" to="/integracoes">Integrações</RouterLink></li>
+          <li><RouterLink class="inline-flex min-h-11 items-center hover:text-white md:min-h-0" to="/precos">Preços</RouterLink></li>
+          <li><RouterLink class="inline-flex min-h-11 items-center hover:text-white md:min-h-0" to="/contato">Contato</RouterLink></li>
         </ul>
       </nav>
 
       <nav aria-labelledby="f-nichos">
         <h2 id="f-nichos" class="mb-3 text-sm font-semibold text-white">Para quem</h2>
-        <ul class="space-y-2 text-sm">
+        <ul class="text-sm md:space-y-2">
           <li v-for="n in niches" :key="n.slug">
-            <RouterLink class="hover:text-white" :to="`/para/${n.slug}`">{{ n.name }}</RouterLink>
+            <RouterLink class="inline-flex min-h-11 items-center hover:text-white md:min-h-0" :to="`/para/${n.slug}`">{{ n.name }}</RouterLink>
           </li>
         </ul>
       </nav>
 
       <nav aria-labelledby="f-legal">
         <h2 id="f-legal" class="mb-3 text-sm font-semibold text-white">Legal</h2>
-        <ul class="space-y-2 text-sm">
-          <li><RouterLink class="hover:text-white" to="/termos">Termos de uso</RouterLink></li>
-          <li><RouterLink class="hover:text-white" to="/privacidade">Política de privacidade</RouterLink></li>
-          <li><RouterLink class="hover:text-white" to="/cookies">Política de cookies</RouterLink></li>
+        <ul class="text-sm md:space-y-2">
+          <li><RouterLink class="inline-flex min-h-11 items-center hover:text-white md:min-h-0" to="/termos">Termos de uso</RouterLink></li>
+          <li><RouterLink class="inline-flex min-h-11 items-center hover:text-white md:min-h-0" to="/privacidade">Política de privacidade</RouterLink></li>
+          <li><RouterLink class="inline-flex min-h-11 items-center hover:text-white md:min-h-0" to="/cookies">Política de cookies</RouterLink></li>
           <li>
-            <button type="button" class="text-left hover:text-white" @click="openConsentBanner">
+            <button type="button" class="inline-flex min-h-11 items-center text-left hover:text-white md:min-h-0" @click="openConsentBanner">
               Preferências de cookies
             </button>
           </li>
