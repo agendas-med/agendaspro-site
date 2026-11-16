@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { RouterView, useRoute, useRouter } from 'vue-router'
 import SiteHeader from './components/layout/SiteHeader.vue'
 import SiteFooter from './components/layout/SiteFooter.vue'
@@ -10,6 +10,12 @@ import { captureAttribution } from './composables/useAttribution.js'
 
 const route = useRoute()
 const router = useRouter()
+
+// Chat: páginas do site (slug null) e /b/:slug (company_slug). Fora: páginas minimalistas com token (/agendamento).
+const chatSlug = computed(() => {
+  if (route.name === 'booking') return String(route.params.slug || '') || undefined
+  return route.meta.minimal ? undefined : null
+})
 const main = ref(null)
 
 onMounted(() => {
@@ -37,5 +43,5 @@ onMounted(() => {
   </main>
   <SiteFooter v-if="!route.meta.minimal" />
   <CookieBanner />
-  <ChatWidget v-if="!route.meta.minimal" />
+  <ChatWidget v-if="chatSlug !== undefined" :slug="chatSlug" />
 </template>
