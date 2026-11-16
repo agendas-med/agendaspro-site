@@ -153,42 +153,115 @@ const expiredText = computed(() =>
 </script>
 
 <template>
-  <section class="rounded-2xl border border-[var(--color-line)] bg-white p-5 text-center" aria-labelledby="pix-title">
-    <h2 id="pix-title" class="text-lg">
-      {{ phase === 'expired' ? 'Prazo do Pix encerrado' : phase === 'cancelled' ? 'Agendamento cancelado' : 'Pague o sinal para garantir o horário' }}
-    </h2>
-    <p v-if="amount && (phase === 'pending' || phase === 'verifying')" class="mt-1 text-2xl font-bold">{{ formatBRL(amount) }}</p>
-
+  <section class="px-panel rounded-2xl border border-[var(--color-line)] bg-white p-4 shadow-card sm:p-5" aria-labelledby="pix-title">
     <template v-if="phase === 'pending' || phase === 'verifying'">
-      <p v-if="!hasPix" class="mt-4 text-sm text-[var(--color-ink-soft)]" role="status">Gerando o seu Pix...</p>
-      <template v-else>
-        <img v-if="qrSrc" :src="qrSrc" alt="QR Code Pix para pagar o sinal" width="192" height="192" class="mx-auto my-4 h-48 w-48 rounded-lg border border-[var(--color-line)]" />
-        <p class="text-sm text-[var(--color-ink-soft)]">
-          Abra o app do seu banco, escolha pagar com Pix e leia o QR Code, ou use o código abaixo.
+      <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <div class="min-w-0">
+          <h2 id="pix-title" class="text-base">Pagar com Pix</h2>
+          <p v-if="amount" class="text-2xl font-bold leading-tight">{{ formatBRL(amount) }}</p>
+        </div>
+        <p v-if="phase === 'verifying'" class="px-pill" role="status">Conferindo o pagamento...</p>
+        <p v-else-if="remaining !== null" class="px-pill" :class="{ 'px-pill-warn': remaining <= 120 }" aria-live="off">
+          <AppIcon name="clock" :size="16" /> Expira em {{ formatCountdown(remaining) }}
         </p>
-        <label for="pix-code" class="sr-only">Pix copia e cola</label>
-        <textarea id="pix-code" class="field mt-3 font-mono text-xs" rows="3" readonly :value="live.pix_copy_paste" @focus="$event.target.select()" />
-        <button type="button" class="btn btn-outline mt-3 w-full" @click="copy">
-          <AppIcon name="copy" :size="18" /> {{ copied ? 'Código copiado' : 'Copiar código Pix' }}
-        </button>
-        <p class="sr-only" role="status" aria-live="polite">{{ copied ? 'Código Pix copiado' : '' }}</p>
+      </div>
+
+      <p v-if="!hasPix" class="mt-4 flex items-center gap-2 text-sm text-[var(--color-ink-soft)]" role="status">
+        <span class="px-spin" aria-hidden="true"></span> Gerando o seu Pix...
+      </p>
+      <template v-else>
+        <!-- no celular o copia e cola vem primeiro: quem paga no mesmo aparelho não consegue ler o QR -->
+        <div class="mt-4 grid gap-4 md:grid-cols-[auto_1fr] md:items-start">
+          <img v-if="qrSrc" :src="qrSrc" alt="QR Code Pix para pagar o sinal" width="176" height="176" class="order-2 mx-auto h-44 w-44 rounded-lg border border-[var(--color-line)] md:order-1" />
+          <div class="order-1 md:order-2">
+            <label for="pix-code" class="text-sm font-semibold">Pix copia e cola</label>
+            <textarea id="pix-code" class="field mt-1 font-mono text-xs" rows="3" readonly :value="live.pix_copy_paste" @focus="$event.target.select()" />
+            <button type="button" class="px-copy mt-2" @click="copy">
+              <AppIcon :name="copied ? 'check' : 'copy'" :size="18" /> {{ copied ? 'Código copiado' : 'Copiar código Pix' }}
+            </button>
+            <p class="sr-only" role="status" aria-live="polite">{{ copied ? 'Código Pix copiado' : '' }}</p>
+            <ol class="mt-3 list-decimal space-y-0.5 pl-5 text-sm text-[var(--color-ink-soft)]">
+              <li>Abra o app do seu banco e escolha pagar com Pix.</li>
+              <li>Cole o código ou leia o QR Code.</li>
+              <li>Confirme o pagamento: o horário é garantido na hora.</li>
+            </ol>
+          </div>
+        </div>
       </template>
 
-      <p v-if="phase === 'verifying'" class="mt-4 text-sm font-semibold" role="status">Conferindo o pagamento...</p>
-      <p v-else-if="remaining !== null" class="mt-4 text-sm font-semibold" aria-live="off">Expira em {{ formatCountdown(remaining) }}</p>
-
-      <button type="button" class="btn btn-primary mt-3 w-full" :disabled="checking" :aria-busy="checking" @click="checkManual">
+      <button type="button" class="btn btn-outline mt-4 w-full" :disabled="checking" :aria-busy="checking" @click="checkManual">
         {{ checking ? 'Verificando...' : 'Já paguei, verificar' }}
       </button>
       <p v-if="checkError" class="field-error" role="status">{{ checkError }}</p>
-      <p class="mt-3 text-xs text-[var(--color-ink-soft)]">O horário é confirmado automaticamente após o pagamento. Pagamento processado pelo Asaas.</p>
+      <p class="mt-3 text-center text-xs text-[var(--color-ink-soft)]">O horário é confirmado automaticamente após o pagamento. Pagamento processado pelo Asaas.</p>
     </template>
 
     <template v-else-if="phase === 'expired'">
-      <p class="mt-4 text-[var(--color-ink-soft)]" role="alert">{{ expiredText }}</p>
+      <h2 id="pix-title" class="text-base">Prazo do Pix encerrado</h2>
+      <p class="mt-2 text-sm text-[var(--color-ink-soft)]" role="alert">{{ expiredText }}</p>
       <button v-if="expiredReason !== 'paid_after_expiry'" type="button" class="btn btn-primary mt-4 w-full" @click="emit('retry')">Refazer agendamento</button>
     </template>
 
-    <p v-else class="mt-4 text-[var(--color-ink-soft)]" role="status">Este agendamento foi cancelado e o horário foi liberado.</p>
+    <template v-else>
+      <h2 id="pix-title" class="text-base">Agendamento cancelado</h2>
+      <p class="mt-2 text-sm text-[var(--color-ink-soft)]" role="status">Este agendamento foi cancelado e o horário foi liberado.</p>
+    </template>
   </section>
 </template>
+
+<style scoped>
+.px-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 9999px;
+  background: #f1f5f9;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+}
+.px-pill-warn {
+  background: #fef3c7;
+  color: #92400e;
+}
+.px-copy {
+  display: inline-flex;
+  width: 100%;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.75rem;
+  background: var(--bk, var(--color-brand-600));
+  color: var(--bk-fg, #fff);
+  font-weight: 600;
+  transition: filter 0.15s;
+}
+.px-copy:hover {
+  filter: brightness(0.92);
+}
+.px-copy:focus-visible {
+  outline: 3px solid var(--bk, var(--color-brand-600));
+  outline-offset: 2px;
+}
+.px-spin {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 9999px;
+  border: 2px solid #cbd5e1;
+  border-top-color: var(--bk, var(--color-brand-600));
+  animation: px-rot 0.8s linear infinite;
+}
+@keyframes px-rot {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .px-spin {
+    animation: none;
+  }
+}
+</style>
