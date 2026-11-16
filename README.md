@@ -37,7 +37,20 @@ Veja `.env.example` (apenas nomes e exemplos; valores reais nunca são versionad
 - `VITE_TURNSTILE_SITE_KEY`: Cloudflare Turnstile (lead e agendamento). Obrigatória em produção: sem ela o envio fica bloqueado com aviso visível. Em dev sem chave, `VITE_TURNSTILE_DEV_BYPASS=true` (ou mock) envia o token fixo de bypass (o core precisa estar com `TURNSTILE_ENABLED=false` e `TURNSTILE_DEV_BYPASS=true`).
 - `VITE_WHATSAPP_NUMBER`: botão de WhatsApp (`wa.me`); vazio oculta o botão.
 - `VITE_GA4_ID`, `VITE_META_PIXEL_ID`, `VITE_CLARITY_ID`: analytics, carregados só após consentimento.
-- `VITE_CHAT_ENABLED`: chat com IA (placeholder, `false` por padrão).
+- `VITE_CHAT_ENABLED`: liga o chat com IA (`false` por padrão). Ver "Chat com IA" abaixo.
+- `VITE_CHAT_LINK_HOSTS`: hosts extras (CSV) aceitos nos links das respostas da IA.
+
+## Chat com IA (texto)
+
+Widget flutuante (`src/components/chat/`), em todas as páginas do site e em `/b/:slug` (aí envia `company_slug` e a audiência "cliente"). Contrato do core: `agendaspro-core/docs/contratos-f5a.md`. Sem voz.
+
+- **Liga/desliga**: `VITE_CHAT_ENABLED=true` no build do site **e** `PUBLIC_CHAT_ENABLED=true` no core. Se o core responder `503 chat_disabled`, o widget se esconde na sessão (sessionStorage). Com a flag `false` nada do chat entra na página.
+- **Carga**: só o botão (leve) está no bundle inicial; o painel é um chunk separado (`ChatPanel-*.js`) baixado ao abrir. O prerender não gera marcação do chat (nada de SSR/hidratação extra).
+- **Fluxo**: o painel pergunta primeiro se a pessoa é cliente ou dona de negócio; só depois cria a sessão (`POST /public/chat/session`) com Turnstile real (dev: `VITE_TURNSTILE_DEV_BYPASS=true`). O token `cs1.*` fica só em memória e `sessionStorage` (nunca `localStorage`, nunca na URL) e as mensagens não são persistidas. Sessão expirada ou bloqueada encerra a conversa; nunca recria sessão sozinho.
+- **Mensagens**: SSE com fallback para JSON, `client_msg_id` para idempotência (reenvio reusa o id), debounce/anti duplo clique, estados de digitando/erro/tentar de novo. Tratados: 429 (com `Retry-After`), 413, 503, `degraded`, sessão encerrada/bloqueada, limites de mensagens/tokens (mostrados com discrição). `suggestions` e `proactive_hint` viram chips/CTAs. Lead (só audiência empresa) com consentimento LGPD; nota e encerramento da conversa.
+- **Segurança**: respostas renderizadas como texto seguro por um parser próprio (`src/lib/chatText.js`), sem `v-html`; links só para hosts da allowlist (`src/lib/chatLinks.js`; `http:` só para localhost em dev). Aviso visível: "Assistente de IA, pode errar; não substitui atendimento humano" + link da política de privacidade.
+- **CSP**: sem mudança; o `connect-src` do host da API (já exigido) cobre o chat, e o Turnstile já está em `script-src`/`frame-src`. `public/_headers` e `vercel.json` continuam idênticos.
+- **Dev/mock**: com `VITE_USE_MOCK=true` o chat usa `src/services/mockChat.js` (só via `import()` atrás de `import.meta.env.DEV`; não vai para o bundle de produção). Palavras que acionam cenários: `429`, `rapido`, `pausa`, `erro`, `lento`, `expirar`, `bloquear`, `limite`, `degradar`, `planos`, `horarios`.
 
 ## Contratos com o core (`/public/*`)
 
