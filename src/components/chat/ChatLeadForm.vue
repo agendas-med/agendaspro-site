@@ -1,7 +1,7 @@
 <script setup>
 // Captura de lead dentro do chat (só audiência "empresa") -> POST /public/chat/lead via controlador.
 // Consentimento LGPD explícito (checkbox desmarcado por padrão + link da política). Sem dado pessoal em URL.
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, reactive, ref, watch } from 'vue'
 import { niches } from '../../data/niches.js'
 import { isValidWhatsappBR, maskPhoneBR, toE164BR } from '../../lib/phone.js'
 
@@ -17,6 +17,12 @@ const first = ref(null)
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
 
 onMounted(() => first.value?.focus())
+
+// Some o erro de um campo assim que ele deixa de ser inválido (sem revalidar os demais).
+watch(() => form.name, (v) => { if (errors.name && v.trim().length >= 2) errors.name = '' })
+watch(() => form.whatsapp, (v) => { if (errors.whatsapp && isValidWhatsappBR(v)) errors.whatsapp = '' })
+watch(() => form.email, (v) => { if (errors.email && (!v || EMAIL_RE.test(v.trim()))) errors.email = '' })
+watch(() => form.consent, (v) => { if (v) errors.consent = '' })
 
 function validate() {
   errors.name = form.name.trim().length >= 2 ? '' : 'Informe o seu nome.'

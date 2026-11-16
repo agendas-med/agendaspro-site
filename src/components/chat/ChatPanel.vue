@@ -115,12 +115,28 @@ watch(
   (v) => controller.setContext(v),
 )
 
+// Quando o elemento focado some (ex.: o botão da nota é trocado pelo "obrigado"), o foco cai no <body> e o
+// keydown do painel não recebe mais nada: o ESC precisa continuar funcionando e o Tab devolve o foco ao painel.
+function onWindowKeydown(e) {
+  if (!props.open || !root.value) return
+  const a = document.activeElement
+  if (a && a !== document.body && root.value.contains(a)) return // o handler do painel cuida
+  if (e.key === 'Escape') {
+    emit('close')
+  } else if (e.key === 'Tab' && (!a || a === document.body)) {
+    e.preventDefault()
+    focusMain()
+  }
+}
+
 onMounted(() => {
+  window.addEventListener('keydown', onWindowKeydown)
   timer = setInterval(() => controller.tick(), 1000)
   controller.restore().finally(focusMain)
   focusMain()
 })
 onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onWindowKeydown)
   clearInterval(timer)
   controller.dispose()
 })
