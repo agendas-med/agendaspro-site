@@ -43,6 +43,7 @@ export const legalDocs = {
       { p: `O AgendasPro tem os planos Free e Premium. O Free não tem mensalidade; o Premium custa ${premiumPrice()} por mês. Os limites e recursos de cada plano estão descritos na página de Preços, que integra estes Termos.` },
       { ul: [
         `Comissão: ${plans.free.commissionLabel} no plano Free e ${plans.premium.commissionLabel} no Premium, calculada sobre os valores recebidos por venda online (por exemplo, o sinal pago por Pix na página de agendamento). Recebimentos fora da plataforma não geram comissão.`,
+        'Para receber pagamentos online, cada Estabelecimento tem uma subconta no Asaas, aberta no cadastro com os dados informados (CPF ou CNPJ, endereço e faturamento) e sujeita à análise e aos termos do Asaas. O sinal pago pelo Cliente final é creditado nessa subconta, e a comissão do AgendasPro é descontada automaticamente na própria transação.',
         'Os pagamentos são processados pelo Asaas, que pode cobrar tarifas próprias conforme a tabela vigente dele. Essas tarifas não fazem parte da comissão do AgendasPro.',
         'A mensalidade do Premium é cobrada a cada ciclo mensal pelo Asaas. Em caso de inadimplência, após um prazo de tolerância a conta volta ao plano Free, sem exclusão dos cadastros.',
         'Não há fidelidade nem multa de cancelamento. Alterações de preço serão comunicadas com antecedência razoável.',
@@ -53,6 +54,8 @@ export const legalDocs = {
 
       { h2: '6. WhatsApp e inteligência artificial' },
       { ul: [
+        'As mensagens aos Clientes finais (confirmações, lembretes e atendimento) são enviadas por um número de WhatsApp do AgendasPro, em nome do Estabelecimento, que é identificado na conversa.',
+        'O Cliente final pode parar de receber mensagens a qualquer momento respondendo PARAR e voltar a recebê-las respondendo VOLTAR.',
         'As mensagens são enviadas pela WhatsApp Business Platform (Meta) e estão sujeitas às políticas da Meta. Você é responsável por usar o serviço apenas com pessoas que tenham relação com o seu negócio, sem envio de spam.',
         'A assistente com IA responde e agenda com base na agenda e nas regras do Estabelecimento. Embora tenha controles, a IA pode errar. Quando a conversa foge do básico, ela transfere para a equipe do Estabelecimento, que é responsável por acompanhar essas conversas.',
         'Conteúdos enviados para a IA podem ser processados por provedores de inteligência artificial, conforme a Política de Privacidade.',
@@ -66,8 +69,9 @@ export const legalDocs = {
         'Não tentar acessar áreas restritas, sobrecarregar a infraestrutura ou copiar o software.',
       ] },
 
-      { h2: '8. Recursos em desenvolvimento' },
-      { p: 'Alguns recursos aparecem no site com o selo "Em breve" (por exemplo, dashboard do Instagram, integração com o Google Agenda, lista de espera e reativação de clientes). Eles ainda não estão disponíveis, podem mudar e não constituem promessa de data de entrega.' },
+      { h2: '8. Integrações e recursos em desenvolvimento' },
+      { p: 'As integrações com o Google Agenda e com o Instagram (plano Premium) funcionam apenas depois que o Estabelecimento autoriza o acesso à própria conta Google ou Instagram, e podem ficar indisponíveis ou limitadas enquanto dependerem de aprovação desses provedores. O acesso pode ser revogado a qualquer momento no painel, na conta Google ou nas configurações de integrações comerciais do Facebook ou do Instagram.' },
+      { p: 'Recursos marcados com o selo "Em breve" (por exemplo, lista de espera e reativação de clientes) ainda não estão disponíveis, podem mudar e não constituem promessa de data de entrega.' },
 
       { h2: '9. Propriedade intelectual' },
       { p: `O software, a marca ${c.brand}, o design e os textos do serviço pertencem a nós ou a nossos licenciantes. Concedemos a você uma licença limitada, revogável e não exclusiva de uso durante a vigência da conta. Os dados que você cadastra continuam sendo seus.` },
@@ -76,13 +80,13 @@ export const legalDocs = {
       { p: 'Empregamos esforços razoáveis para manter o serviço disponível, mas não garantimos funcionamento ininterrupto, inclusive por falhas de terceiros (WhatsApp, Asaas, provedores de nuvem). Na máxima extensão permitida em lei, não respondemos por lucros cessantes ou danos indiretos, e nossa responsabilidade total limita-se ao valor pago por você nos 12 meses anteriores ao fato, ressalvadas as hipóteses em que a lei não permita a limitação.' },
 
       { h2: '11. Encerramento' },
-      { p: 'Você pode encerrar a conta a qualquer momento. Podemos encerrar ou suspender o serviço em caso de violação destes Termos. Após o encerramento, os dados serão tratados conforme a Política de Privacidade.' },
+      { p: 'Você pode encerrar a conta a qualquer momento, inclusive excluindo a empresa pelo painel. Podemos encerrar ou suspender o serviço em caso de violação destes Termos. Após o encerramento, os dados serão tratados conforme a Política de Privacidade.' },
 
       { h2: '12. Alterações destes Termos' },
       { p: 'Podemos atualizar estes Termos. Mudanças relevantes serão comunicadas por e-mail ou aviso na plataforma. O uso continuado após a vigência da nova versão indica concordância.' },
 
       { h2: '13. Lei aplicável e foro' },
-      { p: `Estes Termos são regidos pelas leis do Brasil. Fica eleito o foro da comarca da sede de ${c.legalName}, ressalvado o foro do domicílio do consumidor quando a lei assim determinar.` },
+      { p: 'Estes Termos são regidos pelas leis do Brasil. Fica eleito o foro da comarca de Cambé/PR, ressalvado o foro do domicílio do consumidor quando a lei assim determinar.' },
 
       { h2: '14. Contato' },
       { p: `Dúvidas sobre estes Termos: ${c.supportEmail}. Assuntos de dados pessoais: ${c.dpoEmail}.` },
@@ -123,7 +127,8 @@ export const legalDocs = {
           ['Asaas', 'Processamento de pagamentos (Pix do sinal) e cobrança do plano Premium', 'Nome, contato e dados necessários à cobrança; valor e status do pagamento'],
           ['Meta (WhatsApp Business Platform)', 'Envio e recebimento de mensagens de confirmação, lembretes e atendimento', 'Número de WhatsApp, conteúdo das mensagens'],
           ['OpenAI (ou outro provedor de IA)', 'Interpretação das mensagens e apoio à assistente de agendamento', 'Trechos de conversa e contexto mínimo da agenda, sem envio de dados desnecessários'],
-          ['Google', 'Google Agenda (recurso em breve, Premium) e Google Analytics, se você consentir', 'Dados de agenda sincronizados; dados de navegação'],
+          ['Google', 'Login com Google (se você escolher), Google Agenda (plano Premium, se o Estabelecimento conectar) e Google Analytics (se você consentir)', 'Nome, e-mail e foto do perfil no login; calendários e horários ocupados no Google Agenda; dados de navegação no Analytics'],
+          ['Meta (Instagram)', 'Painel do Instagram (plano Premium, se o Estabelecimento conectar)', 'Dados do perfil profissional, publicações e métricas da conta conectada'],
           ['Cloudflare', 'Verificação anti-robô (Turnstile) e infraestrutura', 'IP e sinais técnicos do navegador'],
           ['Provedores de nuvem e e-mail', 'Hospedagem, banco de dados, backup e e-mails transacionais', 'Dados necessários à operação, com criptografia'],
           ['Autoridades', 'Cumprimento de obrigação legal ou ordem judicial', 'Mediante requisição válida'],
@@ -131,16 +136,26 @@ export const legalDocs = {
       } },
       { p: 'Não vendemos dados pessoais. Alguns desses provedores podem tratar dados fora do Brasil; nesses casos adotamos as salvaguardas do art. 33 da LGPD (por exemplo, cláusulas contratuais ou decisão de adequação).' },
 
-      { h2: '4. Por quanto tempo guardamos' },
+      { h2: '4. Dados de contas Google e Instagram' },
+      { ul: [
+        'Google Agenda: com a autorização do Estabelecimento, lemos a lista de calendários e os horários ocupados dos calendários escolhidos, para bloquear esses horários na agenda do AgendasPro, e criamos eventos no calendário que o próprio Estabelecimento escolher para essa finalidade ou em um calendário criado pelo AgendasPro. Não lemos o conteúdo de outros eventos além do necessário para saber se o horário está ocupado.',
+        'Instagram: com a autorização do Estabelecimento, lemos dados do perfil profissional, das publicações e das métricas para exibir o painel do Instagram. Não publicamos nem enviamos mensagens em nome da conta.',
+        'Usamos esses dados apenas para oferecer esses recursos ao próprio Estabelecimento. Não os vendemos, não os usamos para publicidade e não os usamos para treinar modelos de inteligência artificial. Quando a assistente do painel consulta a agenda, apenas o mínimo necessário é enviado ao provedor de IA.',
+        'O uso e a transferência, pelo AgendasPro, de informações recebidas das APIs do Google obedecem à Política de Dados do Usuário dos Serviços de API do Google, incluindo os requisitos de Uso Limitado.',
+        'Os tokens de acesso são guardados com criptografia. Ao desconectar a integração no painel, apagamos os tokens. Você também pode revogar o acesso em myaccount.google.com/permissions (Google) ou nas configurações de integrações comerciais do Facebook ou do Instagram.',
+      ] },
+
+      { h2: '5. Por quanto tempo guardamos' },
       { ul: [
         'Leads comerciais: até 12 meses após o último contato, salvo se virarem clientes.',
         'Conta e dados do Estabelecimento: durante a vigência do contrato e, depois, pelo prazo necessário a obrigações legais, fiscais e ao exercício regular de direitos (em regra, até 5 anos).',
         'Dados de Clientes finais: pelo período definido pelo Estabelecimento (controlador) e enquanto a conta existir, observados os prazos legais.',
         'Registros de acesso: 6 meses, conforme o Marco Civil da Internet.',
+        'Tokens e dados das integrações com Google e Instagram: enquanto a integração estiver conectada; ao desconectar, os tokens são apagados.',
         'Ao final, os dados são excluídos ou anonimizados, salvo guarda obrigatória por lei.',
       ] },
 
-      { h2: '5. Seus direitos' },
+      { h2: '6. Seus direitos' },
       { p: 'Você pode, a qualquer momento e mediante requisição, exercer os direitos do art. 18 da LGPD:' },
       { ul: [
         'confirmação da existência de tratamento e acesso aos dados;',
@@ -156,20 +171,26 @@ export const legalDocs = {
         'petição à Autoridade Nacional de Proteção de Dados (ANPD).',
       ] },
       { p: `Para exercê-los, escreva ao nosso Encarregado pelo Tratamento de Dados Pessoais (DPO): ${c.dpoName}, ${c.dpoEmail}. Responderemos em prazo razoável, conforme a regulamentação. Se o seu dado é tratado por um Estabelecimento como controlador, podemos encaminhar o pedido a ele.` },
+      { h3: 'Como pedir a exclusão dos seus dados' },
+      { ul: [
+        'Estabelecimentos podem excluir clientes, anonimizar dados e excluir a empresa pelo painel.',
+        'Clientes finais podem pedir a exclusão ao Estabelecimento ou ao nosso Encarregado, pelo e-mail informado acima.',
+        'Se você conectou o Instagram, pode remover o AgendasPro nas configurações de integrações comerciais do Facebook ou do Instagram: a conexão é encerrada e os tokens são apagados. Se pedir a exclusão dos seus dados por lá, o pedido é processado automaticamente e você recebe um código para acompanhar o pedido.',
+      ] },
 
-      { h2: '6. Segurança' },
+      { h2: '7. Segurança' },
       { p: 'Adotamos medidas técnicas e organizacionais razoáveis, como comunicação criptografada (HTTPS), controle de acesso, criptografia de credenciais sensíveis, registros de auditoria e limitação de tentativas. Nenhum sistema é totalmente imune; em caso de incidente de segurança relevante, comunicaremos os titulares e a ANPD conforme a LGPD.' },
 
-      { h2: '7. Cookies e tecnologias semelhantes' },
+      { h2: '8. Cookies e tecnologias semelhantes' },
       { p: 'Usamos cookies e armazenamento local essenciais ao funcionamento do site. Cookies de estatística e marketing só são carregados se você consentir. Veja detalhes e como alterar sua escolha na Política de Cookies.' },
 
-      { h2: '8. Crianças e adolescentes' },
+      { h2: '9. Crianças e adolescentes' },
       { p: 'O AgendasPro é destinado a empresas e profissionais. Agendamentos de menores de idade devem ser feitos por seus responsáveis legais.' },
 
-      { h2: '9. Alterações desta Política' },
+      { h2: '10. Alterações desta Política' },
       { p: 'Podemos atualizar esta Política. A data da última atualização está no início do texto e, em mudanças relevantes, avisaremos por e-mail ou na plataforma.' },
 
-      { h2: '10. Contato e Encarregado (DPO)' },
+      { h2: '11. Contato e Encarregado (DPO)' },
       { ul: [
         `Controlador: ${c.legalName}, CNPJ ${c.cnpj}, ${c.address}.`,
         `Encarregado (DPO): ${c.dpoName}, ${c.dpoEmail}.`,

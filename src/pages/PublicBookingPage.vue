@@ -570,7 +570,7 @@ onBeforeUnmount(() => {
                   <label class="flex min-h-11 items-start gap-3 text-sm">
                     <input id="bk-consent" v-model="form.consent" type="checkbox" class="mt-0.5 h-5 w-5 shrink-0" :style="{ accentColor: 'var(--bk)' }" :aria-invalid="Boolean(errors.consent)" :aria-describedby="errors.consent ? 'bk-consent-err' : undefined" />
                     <span>
-                      Concordo com o tratamento dos meus dados para realizar este agendamento e receber confirmações e lembretes por WhatsApp, conforme a
+                      Li e concordo com os <RouterLink to="/termos" target="_blank" class="underline">Termos de Uso<span class="sr-only"> (abre em nova aba)</span></RouterLink> e com o tratamento dos meus dados para realizar este agendamento e receber confirmações e lembretes por WhatsApp, conforme a
                       <RouterLink to="/privacidade" target="_blank" class="underline">Política de Privacidade<span class="sr-only"> (abre em nova aba)</span></RouterLink>.
                     </span>
                   </label>

@@ -16,7 +16,7 @@ export const company = {
   whatsappNumber: env.whatsappNumber || '5541998771127',
   instagramUrl: '',
   linkedinUrl: '',
-  lastLegalUpdate: '15 de novembro de 2026',
+  lastLegalUpdate: '20 de novembro de 2026',
 }
 
 /** true enquanto algum campo institucional ainda é placeholder. */
